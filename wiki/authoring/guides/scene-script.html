@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scene script commands — VNgine</title>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script>window.SITE_BASE = "../../../";</script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" data-wiki-tree></aside>
+  <main>
+    <h1>Scene script commands</h1>
+    <p class="lede">A scene is a JSON file holding a flat list of commands. The engine runs them
+    one after another and only stops where the player has to do something — a line of dialogue to
+    tap through, or a choice to make.</p>
+
+    <p>Path: <code>qml/game/script/&lt;scene_id&gt;.json</code></p>
+
+<pre><code>{
+    "id": "scene_0001",
+    "commands": [
+        { "cmd": "bg",  "image": "bg/centre_exterior_evening.png" },
+        { "cmd": "say", "speaker": null, "text": "You are at your local community centre." },
+        { "cmd": "jump", "scene": "scene_0002" }
+    ]
+}</code></pre>
+
+    <div class="todo"><strong>Authoring rule</strong> — a scene must end with a <code>jump</code>.
+    Running off the end of the command list is an authoring error; the engine warns and pops back
+    out of the game screen.</div>
+
+    <h2>Implemented commands</h2>
+    <table>
+      <tr><th>Command</th><th>Keys</th><th>What it does</th></tr>
+      <tr><td><code>say</code></td><td><code>speaker</code>, <code>text</code></td>
+          <td>Shows a line in the textbox with the typewriter effect and waits for a tap.
+              <code>"speaker": null</code> means narration.</td></tr>
+      <tr><td><code>bg</code></td><td><code>image</code></td>
+          <td>Sets the background, relative to <code>assets/</code>. Continues immediately.</td></tr>
+      <tr><td><code>sprite</code></td><td><code>id</code>, <code>image</code>, <code>position</code></td>
+          <td>Shows or replaces a sprite. Re-using an <code>id</code> swaps that sprite's image and position.</td></tr>
+      <tr><td><code>sprite_remove</code></td><td><code>id</code></td><td>Removes that sprite.</td></tr>
+      <tr><td><code>set</code></td><td><code>var</code>, <code>op</code>, <code>value</code> or <code>from</code></td>
+          <td>Changes a variable. See <a href="variables.html">Variables and conditions</a>.</td></tr>
+      <tr><td><code>label</code></td><td><code>label</code></td>
+          <td>A marker to jump to. Does nothing on its own. Labels are indexed per scene, so a
+              label is only reachable inside its own scene.</td></tr>
+      <tr><td><code>jump</code></td><td><code>label</code> or <code>scene</code></td>
+          <td>Continues somewhere else.</td></tr>
+      <tr><td><code>jump_if</code></td><td><code>condition</code> + <code>label</code>/<code>scene</code></td>
+          <td>Jumps only when the condition is true, otherwise falls through to the next command.</td></tr>
+      <tr><td><code>choice</code></td><td><code>options</code></td>
+          <td>Shows a menu and waits. See below.</td></tr>
+      <tr><td><code>style</code></td><td><code>category</code>, <code>style</code></td>
+          <td>Switches the active style for <code>textbox</code>, <code>choice</code> or <code>hud</code>.
+              If the style cannot be loaded the current one is kept and a warning is logged.</td></tr>
+    </table>
+
+    <p>An unknown command is logged and skipped, so a typo will not stall the game — but it will
+    not do what you meant either. Watch the console output while testing.</p>
+
+    <h2>Dialogue</h2>
+<pre><code>{ "cmd": "say", "speaker": null,    "text": "The noticeboard is covered in paper." }
+{ "cmd": "say", "speaker": "Liisa", "text": "Like this, %player_title%?" }</code></pre>
+    <p>Every displayed string passes through variable interpolation: <code>%name%</code> is
+    replaced by the variable of that name, or by a setting of that name. An unknown name is left
+    as-is and logged.</p>
+
+    <h2>Sprites</h2>
+<pre><code>{ "cmd": "sprite", "id": "liisa", "image": "sprites/liisa_1.png", "position": "left" }
+{ "cmd": "sprite", "id": "liisa", "image": "sprites/liisa_2.png", "position": "60%,0" }
+{ "cmd": "sprite_remove", "id": "liisa" }</code></pre>
+    <p><code>position</code> accepts <code>left</code>, <code>right</code>, anything else centres
+    the sprite, or a percentage pair like <code>"60%,0"</code> to place it by hand. The percentage
+    is the horizontal centre of the sprite.</p>
+
+    <h2>Choices</h2>
+<pre><code>{
+    "cmd": "choice",
+    "options": [
+        {
+            "text": "Don't panic",
+            "condition": { "var": "panic", "op": "&lt;", "value": 3 },
+            "label": "dont_panic"
+        },
+        {
+            "text": "Panic",
+            "condition": null,
+            "effects": [ { "var": "panic", "op": "sub", "value": 1 } ],
+            "label": "label_panic"
+        },
+        {
+            "text": "Panic hard",
+            "effects": [ { "var": "panic", "op": "sub", "value": 1 } ]
+        }
+    ]
+}</code></pre>
+    <table>
+      <tr><th>Key</th><th>Meaning</th></tr>
+      <tr><td><code>text</code></td><td>The option label. Interpolated like dialogue.</td></tr>
+      <tr><td><code>condition</code></td><td>Option is hidden unless this is true. <code>null</code> or absent means always visible.</td></tr>
+      <tr><td><code>effects</code></td><td>List of <code>set</code>-style changes applied when the option is picked.</td></tr>
+      <tr><td><code>label</code></td><td>Where to continue. Without it, the script simply carries on after the choice.</td></tr>
+    </table>
+    <p>If every option is hidden, the engine warns and skips the choice rather than trapping the
+    player — so make sure at least one option has no condition.</p>
+
+    <h2>Styles mid-scene</h2>
+<pre><code>{ "cmd": "style", "category": "textbox", "style": "colorful_textbox" }</code></pre>
+    <p>Build the style file with the <a href="../../../tools/textbox.html">textbox style generator</a>.</p>
+
+    <div class="todo"><strong>TODO</strong> — audio, transitions, HUD and text effects appear in the
+    sample script but are not implemented yet. They are documented once they land.</div>
+
+    <div class="pager">
+      <a href="manifest.html">← Manifest</a>
+      <a href="variables.html">Variables and conditions →</a>
+    </div>
+  </main>
+</div>
+<script src="../../../assets/js/sitemap.js"></script>
+<script src="../../../assets/js/nav.js"></script>
+<script src="../../../assets/js/cards.js"></script>
+</body>
+</html>

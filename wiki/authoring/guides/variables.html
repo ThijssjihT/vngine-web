@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Variables and conditions — VNgine</title>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script>window.SITE_BASE = "../../../";</script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" data-wiki-tree></aside>
+  <main>
+    <h1>Variables and conditions</h1>
+    <p class="lede">Variables are how your story remembers things. Conditions are how it reacts to
+    them: hiding a choice, taking a different branch, or changing what a character says.</p>
+
+    <h2>Declaring</h2>
+    <p>Variables are declared in the <a href="manifest.html">manifest</a> with a starting value.
+    On a new game the engine fills each one with its <code>default</code>.</p>
+<pre><code>"variables": {
+    "panic": { "type": "int", "default": 1 }
+}</code></pre>
+    <p>Variables are saved and restored with the save game, so a loaded game continues with the
+    values it had.</p>
+
+    <h2>Changing a variable</h2>
+<pre><code>{ "cmd": "set", "var": "panic", "op": "set", "value": 3 }
+{ "cmd": "set", "var": "panic", "op": "add", "value": 6 }
+{ "cmd": "set", "var": "gold",  "op": "from", "from": { "setting": "starting_wealth" } }</code></pre>
+    <table>
+      <tr><th><code>op</code></th><th>Effect</th></tr>
+      <tr><td><code>set</code></td><td>Replaces the value.</td></tr>
+      <tr><td><code>add</code></td><td>Adds. An unset variable counts as 0.</td></tr>
+      <tr><td><code>sub</code></td><td>Subtracts. An unset variable counts as 0.</td></tr>
+      <tr><td><code>mul</code></td><td>Multiplies. An unset variable counts as 0 — so multiplying an unset variable gives 0.</td></tr>
+    </table>
+    <p>Instead of a literal <code>value</code>, a command can take its value from somewhere else
+    with <code>from</code>:</p>
+<pre><code>"from": { "var": "gold" }              // another variable
+"from": { "setting": "difficulty" }    // a settings value</code></pre>
+    <p>An unknown op, or a value that resolves to nothing, is logged and ignored rather than
+    crashing the scene.</p>
+
+    <h2>Conditions</h2>
+    <p>A condition is an object. It names what to look at, how to compare, and what to compare
+    against.</p>
+<pre><code>{ "var":     "panic",      "op": "&lt;",  "value": 3 }
+{ "setting": "difficulty", "op": "==", "value": "hard" }
+{ "flag":    "arachnofobia" }</code></pre>
+    <table>
+      <tr><th>Key</th><th>Looks at</th></tr>
+      <tr><td><code>var</code></td><td>A game variable.</td></tr>
+      <tr><td><code>setting</code></td><td>A value from the settings page.</td></tr>
+      <tr><td><code>flag</code></td><td>A variable, falling back to a setting of the same name.</td></tr>
+    </table>
+    <p>Operators: <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>,
+    <code>&gt;</code>, <code>&gt;=</code>. Comparison is strict, so <code>3</code> and
+    <code>"3"</code> are not equal — keep your types consistent with what you declared.</p>
+    <p>With no <code>op</code>, the value is simply tested for truthiness: <code>0</code>, an empty
+    string and <code>false</code> are false, everything else is true. That is the short form for a
+    flag.</p>
+    <p>No condition at all — a missing key or <code>null</code> — is true. An undefined variable
+    or a missing comparison value is false, with a warning.</p>
+
+    <h2>Where conditions are used</h2>
+<pre><code>{ "cmd": "jump_if", "condition": { "var": "panic", "op": "&gt;=", "value": 3 }, "label": "meltdown" }</code></pre>
+    <p>And on choice options, to hide them until they are earned — see
+    <a href="scene-script.html">Scene script commands</a>.</p>
+
+    <h2>Showing variables in text</h2>
+    <p>Wrap the name in percent signs. The engine looks for a variable first, then a setting.</p>
+<pre><code>{ "cmd": "say", "speaker": "Liisa", "text": "Like this, %player_title%?" }</code></pre>
+    <p>Names must start with a letter or underscore and contain only letters, digits and
+    underscores. An unknown name is left in the text as written, so a typo shows up on screen.</p>
+
+    <div class="pager">
+      <a href="scene-script.html">← Scene script commands</a>
+      <a href="theming.html">Styles →</a>
+    </div>
+  </main>
+</div>
+<script src="../../../assets/js/sitemap.js"></script>
+<script src="../../../assets/js/nav.js"></script>
+<script src="../../../assets/js/cards.js"></script>
+</body>
+</html>

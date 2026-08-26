@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manifest (game.json) — VNgine</title>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script>window.SITE_BASE = "../../../";</script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" data-wiki-tree></aside>
+  <main>
+    <h1>Manifest (game.json)</h1>
+    <p class="lede">One file at the root of your game folder. It tells the engine what your game
+    is called, where the story starts, what the settings page contains, and which variables exist
+    before the first command runs.</p>
+
+    <p>Path: <code>qml/game/game.json</code></p>
+
+    <h2>Core keys</h2>
+    <table>
+      <tr><th>Key</th><th>Type</th><th>Meaning</th></tr>
+      <tr><td><code>title</code></td><td>string</td><td>Game title, shown on the title screen.</td></tr>
+      <tr><td><code>version</code></td><td>string</td><td>Your game's version, independent of the engine version.</td></tr>
+      <tr><td><code>tagline</code></td><td>string</td><td>One-line description shown under the title.</td></tr>
+      <tr><td><code>entry_scene</code></td><td>string</td><td>Scene id the game starts from, e.g. <code>scene_0001</code>. The file must exist as <code>script/&lt;id&gt;.json</code>.</td></tr>
+      <tr><td><code>default_language</code></td><td>string</td><td>Language code used when nothing else is chosen.</td></tr>
+      <tr><td><code>save_display_variable</code></td><td>string</td><td>Name of a variable whose value is used as the label on save slots. If it is not declared under <code>variables</code>, the engine creates it with the value <code>"empty"</code>.</td></tr>
+      <tr><td><code>default_styles</code></td><td>object</td><td>Style id per category applied at the start, e.g. <code>{ "textbox": "boring_textbox" }</code>. See <a href="theming.html">Styles</a>.</td></tr>
+      <tr><td><code>credits</code></td><td>object</td><td>Named blocks of credit lines. Each value is an array of strings, shown as a block.</td></tr>
+    </table>
+
+    <h2>Variables</h2>
+    <p>Every variable your script uses should be declared here, with a starting value. The engine
+    reads the <code>default</code> of each entry when a new game starts.</p>
+<pre><code>"variables": {
+    "panic":         { "type": "int",    "default": 1 },
+    "chapter_title": { "type": "string", "default": "Prologue" }
+}</code></pre>
+    <p>See <a href="variables.html">Variables and conditions</a> for how to read and change them.</p>
+
+    <h2>Settings</h2>
+    <p>The settings page is built from the manifest — you describe the controls, the engine renders
+    them and stores the values. Settings can be read from the script exactly like variables.</p>
+
+    <h3>Audio channels</h3>
+    <p>Each channel becomes a volume slider. <code>default</code> is a percentage.</p>
+<pre><code>"audio_channels": {
+    "music":   { "label": "Music",   "default": 80 },
+    "voice":   { "label": "Voice",   "default": 100 },
+    "game_fx": { "label": "GameFX",  "default": 80 },
+    "text_fx": { "label": "TextFX",  "default": 40 }
+}</code></pre>
+
+    <h3>Languages</h3>
+<pre><code>"languages": {
+    "text":  { "label": "Language", "options": ["English", "Nederlands"], "default": "English" },
+    "voice": { "label": "Voice",    "options": ["English", "Japanese"],   "default": "English" }
+}</code></pre>
+
+    <h3>Toggles, dropdowns, text fields and sliders</h3>
+<pre><code>"toggles": {
+    "arachnofobia": { "label": "Arachnofobia mode", "default": false }
+},
+"dropdowns": {
+    "difficulty": { "label": "Difficulty", "options": ["easy", "normal", "hard"], "default": "normal" }
+},
+"textfields": {
+    "player_title": { "label": "What do others call you by?", "default": "Mister" }
+},
+"sliders": {
+    "starting_wealth": { "label": "Starting wealth", "min": 10, "max": 100, "stepsize": 1, "default": 20 }
+}</code></pre>
+
+    <div class="todo"><strong>Design limit</strong> — up to four of each: four toggles, four
+    dropdowns, four text fields and four sliders. This is a deliberate limit on how much a settings
+    page should hold, not something the engine enforces today.</div>
+
+    <p>A text field value can be dropped straight into dialogue with
+    <code>%player_title%</code>, and any setting can be tested in a condition with
+    <code>{ "setting": "difficulty", "op": "==", "value": "hard" }</code>.</p>
+
+    <div class="todo"><strong>TODO</strong> — full list of accepted <code>type</code> values for variables, where <code>has_adult_content</code> belongs, and what happens on an invalid manifest.</div>
+
+    <div class="pager">
+      <a href="index.html">← Reference</a>
+      <a href="scene-script.html">Scene script commands →</a>
+    </div>
+  </main>
+</div>
+<script src="../../../assets/js/sitemap.js"></script>
+<script src="../../../assets/js/nav.js"></script>
+<script src="../../../assets/js/cards.js"></script>
+</body>
+</html>

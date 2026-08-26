@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styles — VNgine</title>
+<link rel="stylesheet" href="../../../assets/css/site.css">
+<script>window.SITE_BASE = "../../../";</script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" data-wiki-tree></aside>
+  <main>
+    <h1>Styles</h1>
+    <p class="lede">A style is a small JSON file describing how one part of the interface looks.
+    Styles come in categories — <code>textbox</code>, <code>choice</code>, <code>hud</code> — and
+    can inherit from one another.</p>
+
+    <p>Path: <code>qml/game/assets/ui/&lt;category&gt;/&lt;style_id&gt;.json</code></p>
+
+    <h2>How a style is resolved</h2>
+    <p>Three layers are merged, each overriding the one below:</p>
+    <ol>
+      <li>the engine default for that category (<code>qml/engine/engine_defaults/default_&lt;category&gt;.json</code>)</li>
+      <li>the parent chain, if the file has a <code>base</code></li>
+      <li>the file's own <code>style</code> block</li>
+    </ol>
+    <p>The merge is deep: setting <code>background.color</code> leaves
+    <code>background.opacity</code> alone. That is why a style file only needs to list what it
+    changes — everything you leave out keeps working, and keeps following the engine default if
+    that default ever changes.</p>
+
+    <h2>Inheritance</h2>
+<pre><code>{
+    "base": "boring_textbox",
+    "style": {
+        "background": { "color": "#3050c0" },
+        "radius": 16
+    }
+}</code></pre>
+    <p>A parent can have a parent of its own. The chain is followed to the end, then merged back
+    down. Two rules to know:</p>
+    <ul>
+      <li>A circular chain is detected, logged, and the whole style fails to load.</li>
+      <li>A <code>base</code> naming a file that will not load fails the whole chain — the engine
+      does not silently fall back halfway.</li>
+    </ul>
+    <p>The style id is a bare file name. Dots and slashes are rejected, so a style cannot reach
+    outside its category folder.</p>
+    <p>If a style cannot be resolved at all, the engine warns and falls back to the engine default.</p>
+
+    <h2>Applying a style</h2>
+    <p>At the start of the game, from the <a href="manifest.html">manifest</a>:</p>
+<pre><code>"default_styles": {
+    "textbox": "boring_textbox"
+}</code></pre>
+    <p>Or during a scene:</p>
+<pre><code>{ "cmd": "style", "category": "textbox", "style": "colorful_textbox" }</code></pre>
+
+    <h2>The textbox style</h2>
+    <p>These are the engine defaults. Anything you do not set behaves like this.</p>
+<pre><code>{
+    "style": {
+        "position": "bottom",
+        "height": 0.25,
+        "margins": { "left": 0, "right": 0, "top": 0, "bottom": 0 },
+        "padding": { "left": 24, "right": 24, "top": 24, "bottom": 24 },
+        "background": { "color": "#000000", "opacity": 0.7 },
+        "border": { "width": 0, "color": "#000000", "opacity": 1 },
+        "radius": 0
+    }
+}</code></pre>
+    <table>
+      <tr><th>Key</th><th>Meaning</th></tr>
+      <tr><td><code>position</code></td><td><code>bottom</code>, <code>center</code> or <code>top</code>.</td></tr>
+      <tr><td><code>height</code></td><td>Fraction of the screen height, 0 to 1.</td></tr>
+      <tr><td><code>margins</code></td><td>Space outside the box, in scaled pixels.</td></tr>
+      <tr><td><code>padding</code></td><td>Space between the box edge and the text, in scaled pixels.</td></tr>
+      <tr><td><code>background</code></td><td>Fill colour and its opacity (0 to 1).</td></tr>
+      <tr><td><code>border</code></td><td>Border width in scaled pixels, plus colour and opacity.</td></tr>
+      <tr><td><code>radius</code></td><td>Corner radius in scaled pixels.</td></tr>
+    </table>
+
+    <div class="todo"><strong>Scaled pixels</strong> — every pixel value above
+    (margins, padding, border width, radius) is multiplied by <code>Theme.pixelRatio</code> at
+    render time. Write the numbers as they should look on a reference 540&nbsp;px-wide screen and
+    they stay proportionally the same on every device. <code>height</code> is a fraction, so it is
+    not scaled.</div>
+
+    <h2>Choice and HUD styles</h2>
+    <p>Both categories currently have a two-key default:</p>
+<pre><code>{
+    "style": {
+        "color": "#000000",
+        "opacity": 0.7
+    }
+}</code></pre>
+
+    <h2>Building one</h2>
+    <p>The <a href="../../../tools/textbox.html">textbox style generator</a> writes these files for
+    you, with a live preview. It outputs only the values that differ from the default, which is
+    exactly what you want in a style file.</p>
+
+    <div class="pager">
+      <a href="variables.html">← Variables and conditions</a>
+      <a href="localisation.html">Localisation →</a>
+    </div>
+  </main>
+</div>
+<script src="../../../assets/js/sitemap.js"></script>
+<script src="../../../assets/js/nav.js"></script>
+<script src="../../../assets/js/cards.js"></script>
+</body>
+</html>

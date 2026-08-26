@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample story — VNgine</title>
+<link rel="stylesheet" href="../assets/css/site.css">
+<script>window.SITE_BASE = "../";</script>
+</head>
+<body>
+<div class="page">
+  <p class="breadcrumb"><a href="index.html">Games</a> / Sample story</p>
+
+  <img class="hero" src="../assets/img/sample-story-banner.jpg" alt="A person in front of a lit noticeboard on a Helsinki street at dusk, a tram passing behind.">
+
+  <h1>Sample story</h1>
+  <p class="lede">A sample game to show developers how to use JSON files to script their game
+  in VNgine.</p>
+
+  <table>
+    <tr><th>Status</th><td>In development</td></tr>
+    <tr><th>Genre</th><td>Comedy, fourth-wall breaking, engine demo</td></tr>
+    <tr><th>Length</th><td>A few minutes</td></tr>
+    <tr><th>Languages</th><td>English (Nederlands planned)</td></tr>
+    <tr><th>Version</th><td>0.1.0</td></tr>
+    <tr><th>Author</th><td>Thijs Janssen</td></tr>
+    <tr><th>Links</th><td><a href="https://github.com/ThijssjihT/VNgine" target="_blank" rel="noopener">VNgine repository</a> — the game lives in <code>qml/game/</code></td></tr>
+  </table>
+
+  <h2>What it is</h2>
+  <p>The sample story is not really a story. It is the reference game bundled with the engine:
+  every feature the engine has, exercised in a script you can read. If you are writing your first
+  game, this is the file to copy from.</p>
+  <p>You stand in front of a noticeboard at your local community centre. A peculiar piece of
+  paper explains that a hobby programmer has been building a visual novel engine for
+  SailfishOS — and the player works out, loudly, that they are inside it.</p>
+
+  <h2>What it demonstrates</h2>
+  <table>
+    <tr><th>Feature</th><th>How the sample uses it</th></tr>
+    <tr><td>Backgrounds</td><td><code>bg</code> commands switching between the community centre exterior and a noticeboard close-up</td></tr>
+    <tr><td>Dialogue</td><td>Narration (<code>speaker: null</code>) alongside named speakers</td></tr>
+    <tr><td>Sprites</td><td>Liisa, positioned and swapped during the scene</td></tr>
+    <tr><td>Variables</td><td>A <code>panic</code> integer, raised and lowered by choices</td></tr>
+    <tr><td>Conditional choices</td><td>A "Don't panic" option that only appears once <code>panic &lt; 3</code></td></tr>
+    <tr><td>Labels and jumps</td><td>A loop back to <code>start_panicing</code> until the player calms down</td></tr>
+    <tr><td>Text interpolation</td><td><code>%player_title%</code>, filled in from a settings text field</td></tr>
+    <tr><td>Styles</td><td>Switching the textbox style mid-scene with a <code>style</code> command</td></tr>
+    <tr><td>Save labels</td><td><code>save_display_variable</code> set to <code>chapter_title</code>, so saves read "Prologue"</td></tr>
+    <tr><td>Settings</td><td>Audio channels, language selectors, toggles, a dropdown, text fields and a slider</td></tr>
+  </table>
+
+  <h2>Running it</h2>
+  <p>The sample game is what you get when you build and run VNgine as-is — there is nothing extra
+  to install. Clone the repository, build <code>harbour-vngine</code> for your device, and the
+  sample game starts from the title screen.</p>
+
+  <div class="todo"><strong>TODO</strong> — in-game screenshots, and a download link once there is a build to hand out.</div>
+
+  <h2>Credits</h2>
+  <p><strong>Game</strong> — by Thijs Janssen. The game itself, excluding the engine and assets, is licence free.</p>
+  <p><strong>Music</strong> — <em>Origami</em> by Scott Buckley
+  (<a href="https://www.scottbuckley.com.au" target="_blank" rel="noopener">scottbuckley.com.au</a>),
+  promoted by <a href="https://www.chosic.com/free-music/all/" target="_blank" rel="noopener">Chosic</a>,
+  <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>.</p>
+  <p><strong>Character art</strong> — Liisa, originally "miki" from the miki asset pack by Noraneko Games.</p>
+
+  <div class="pager">
+    <a href="index.html">← All games</a>
+    <a href="../wiki/authoring/index.html">Write your own →</a>
+  </div>
+</div>
+<script src="../assets/js/sitemap.js"></script>
+<script src="../assets/js/nav.js"></script>
+<script src="../assets/js/cards.js"></script>
+</body>
+</html>
