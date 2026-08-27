@@ -3,17 +3,832 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Choice style — VNgine</title>
+<title>Choice style generator — VNgine</title>
 <link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/tool.css">
 <script>window.SITE_BASE = "../";</script>
 </head>
 <body>
-<div class="page">
-  <h1>Choice style</h1>
-    <div class="todo"><strong>TODO</strong> — this page has not been written yet.</div>
+<div class="page wide">
+  <p class="breadcrumb"><a href="index.html">Tools</a> / Choice style</p>
+  <h1>Choice style generator</h1>
+  <p class="lede">Builds a choice style file for VNgine. Save the result as
+  <code>qml/game/assets/ui/choice/&lt;name&gt;.json</code> and activate it from a scene with a
+  <code>style</code> command, or from the manifest under <code>default_styles</code>.</p>
+
+  <div class="tool">
+    <!-- ============ preview ============ -->
+    <div class="tool-preview">
+      <div class="preview-head">
+        <label for="device">Preview on</label>
+        <select id="device"></select>
+        <div class="custom-size" id="customSize" hidden>
+          <div class="row">
+            <input type="number" id="customW" min="120" value="1080"> ×
+            <input type="number" id="customH" min="120" value="2340">
+          </div>
+        </div>
+      </div>
+      <div class="preview-frame" id="frame">
+        <div class="preview-bg"></div>
+        <div class="preview-sprite"></div>
+        <div class="preview-textbox" id="previewBox">
+          <div class="preview-inner" id="previewInner">
+            <div class="preview-speaker">Liisa</div>
+            <div class="preview-text">People leave things for attention sometimes. Or to hide them
+            in plain sight.</div>
+          </div>
+        </div>
+        <div class="preview-choiceframe" id="choiceFrame">
+          <div class="preview-choicegrid" id="choiceGrid">
+            <div class="preview-option">Ask her about the tape</div>
+            <div class="preview-option">Pin the slip back and say nothing</div>
+            <div class="preview-option">Take it</div>
+          </div>
+        </div>
+        <div class="preview-warn" id="previewWarn" hidden></div>
+      </div>
+      <p class="preview-meta" id="previewMeta"></p>
+    </div>
+
+    <!-- ============ form ============ -->
+    <form id="form" autocomplete="off" onsubmit="return false;">
+
+      <fieldset>
+        <legend>File</legend>
+        <div class="field">
+          <label for="styleId">Style name</label>
+          <input type="text" id="styleId" value="my_choice">
+        </div>
+        <p class="hint">Saved as <code id="pathHint">assets/ui/choice/my_choice.json</code></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Inherit from</legend>
+        <div class="btn-row">
+          <label class="btn" for="parentInput">Upload parent style(s)…</label>
+          <input type="file" id="parentInput" accept=".json,application/json" multiple hidden>
+          <button type="button" class="btn" id="clearParents">Clear</button>
+        </div>
+        <p class="hint">Upload the parent file. If that parent has a parent of its own, upload the
+        whole chain at once — the order does not matter, the chain is worked out from each file's
+        <code>base</code> key. Parents must be other <em>choice</em> styles; the engine rejects a
+        <code>base</code> that points outside the category.</p>
+        <div id="chainBox" class="chain empty">No parent — starting from the engine defaults.</div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Match a textbox style</legend>
+        <div class="btn-row">
+          <label class="btn" for="matchInput">Upload textbox style…</label>
+          <input type="file" id="matchInput" accept=".json,application/json" hidden>
+          <button type="button" class="btn primary" id="applyMatch" disabled>Apply to form</button>
+          <button type="button" class="btn" id="clearMatch">Clear</button>
+        </div>
+        <div class="dropzone" id="matchDrop">…or drop a textbox <code>.json</code> here</div>
+        <div class="match-groups">
+          <span class="lbl">Copy</span>
+          <label class="check"><input type="checkbox" id="mBackground" checked> background</label>
+          <label class="check"><input type="checkbox" id="mBorder" checked> border and radius</label>
+          <label class="check"><input type="checkbox" id="mPadding"> padding</label>
+          <span class="lbl">Onto</span>
+          <label class="check"><input type="checkbox" id="tOption" checked> each option</label>
+          <label class="check"><input type="checkbox" id="tGrid"> the grid frame</label>
+        </div>
+        <p class="match-state" id="matchState">No textbox style loaded. The preview uses the engine
+        defaults for the dialogue box behind the choices.</p>
+        <p class="hint">This is a one-time copy into the form below, not a live link — the engine has
+        no cross-category inheritance, so the values are written into your choice file as ordinary
+        overrides and will not follow later edits to the textbox style. Copying the background onto
+        both the grid and the options stacks the two alphas, so the options come out darker than the
+        textbox. Text colour is not copied: the textbox schema has no text colour yet.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Grid — layout</legend>
+        <div class="field">
+          <label for="columns">Columns</label>
+          <input type="number" id="columns" min="1" max="6" data-key="grid.columns" data-type="number">
+        </div>
+        <div class="field">
+          <label for="spacing">Spacing between options</label>
+          <input type="number" id="spacing" min="0" data-key="grid.spacing" data-type="number">
+        </div>
+        <div class="field">
+          <label for="gridWidth">Width</label>
+          <div class="row">
+            <input type="range" id="gridWidth" min="0.1" max="1" step="0.01" data-key="grid.width" data-type="float">
+            <span class="val" data-mirror="grid.width" data-format="pct"></span>
+          </div>
+        </div>
+        <p class="hint">Fraction of the width the left and right margins leave. The grid's height
+        comes from its contents, so there is nothing to set for it.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Grid — margins (outside the frame)</legend>
+        <div class="grid4">
+          <label class="sub"><span>left</span>  <input type="number" data-key="grid.margins.left"   data-type="number"></label>
+          <label class="sub"><span>right</span> <input type="number" data-key="grid.margins.right"  data-type="number"></label>
+          <label class="sub"><span>top</span>   <input type="number" data-key="grid.margins.top"    data-type="number"></label>
+          <label class="sub"><span>bottom</span><input type="number" data-key="grid.margins.bottom" data-type="number"></label>
+        </div>
+        <p class="hint">Margins inset the region the grid is centred in. Equal left and right margins
+        therefore look the same as none; uneven ones shift the grid.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Grid — padding (inside the frame)</legend>
+        <div class="grid4">
+          <label class="sub"><span>left</span>  <input type="number" data-key="grid.padding.left"   data-type="number"></label>
+          <label class="sub"><span>right</span> <input type="number" data-key="grid.padding.right"  data-type="number"></label>
+          <label class="sub"><span>top</span>   <input type="number" data-key="grid.padding.top"    data-type="number"></label>
+          <label class="sub"><span>bottom</span><input type="number" data-key="grid.padding.bottom" data-type="number"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Grid — background and border</legend>
+        <div class="field">
+          <label for="gBgColorText">Colour</label>
+          <div class="row">
+            <input type="color" id="gBgColor" data-pair="grid.background.color">
+            <input type="text" id="gBgColorText" data-key="grid.background.color" spellcheck="false">
+          </div>
+        </div>
+        <div class="field">
+          <label for="gBgOpacity">Opacity</label>
+          <div class="row">
+            <input type="range" id="gBgOpacity" min="0" max="1" step="0.01" data-key="grid.background.opacity" data-type="float">
+            <span class="val" data-mirror="grid.background.opacity"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="gBorderWidth">Border width</label>
+          <input type="number" id="gBorderWidth" min="0" data-key="grid.border.width" data-type="number">
+        </div>
+        <div class="field">
+          <label for="gBorderColorText">Border colour</label>
+          <div class="row">
+            <input type="color" id="gBorderColor" data-pair="grid.border.color">
+            <input type="text" id="gBorderColorText" data-key="grid.border.color" spellcheck="false">
+          </div>
+        </div>
+        <div class="field">
+          <label for="gBorderOpacity">Border opacity</label>
+          <div class="row">
+            <input type="range" id="gBorderOpacity" min="0" max="1" step="0.01" data-key="grid.border.opacity" data-type="float">
+            <span class="val" data-mirror="grid.border.opacity"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="gRadius">Corner radius</label>
+          <input type="number" id="gRadius" min="0" data-key="grid.radius" data-type="number">
+        </div>
+        <p class="hint">A frame background only shows where the options do not cover it — the
+        padding, the spacing gaps, and any rounded corners.</p>
+        <p class="chain-warn" id="gBorderWarn" hidden></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Option — size and padding</legend>
+        <div class="field">
+          <label for="minHeight">Minimum height</label>
+          <input type="number" id="minHeight" min="0" data-key="option.min_height" data-type="number">
+        </div>
+        <p class="hint">An option is as wide as the grid and its columns allow, and as tall as its
+        text needs. This only stops a one-word option from collapsing to a sliver.</p>
+        <div class="grid4">
+          <label class="sub"><span>left</span>  <input type="number" data-key="option.padding.left"   data-type="number"></label>
+          <label class="sub"><span>right</span> <input type="number" data-key="option.padding.right"  data-type="number"></label>
+          <label class="sub"><span>top</span>   <input type="number" data-key="option.padding.top"    data-type="number"></label>
+          <label class="sub"><span>bottom</span><input type="number" data-key="option.padding.bottom" data-type="number"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Option — background and border</legend>
+        <div class="field">
+          <label for="oBgColorText">Colour</label>
+          <div class="row">
+            <input type="color" id="oBgColor" data-pair="option.background.color">
+            <input type="text" id="oBgColorText" data-key="option.background.color" spellcheck="false">
+          </div>
+        </div>
+        <div class="field">
+          <label for="oBgOpacity">Opacity</label>
+          <div class="row">
+            <input type="range" id="oBgOpacity" min="0" max="1" step="0.01" data-key="option.background.opacity" data-type="float">
+            <span class="val" data-mirror="option.background.opacity"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="oBorderWidth">Border width</label>
+          <input type="number" id="oBorderWidth" min="0" data-key="option.border.width" data-type="number">
+        </div>
+        <div class="field">
+          <label for="oBorderColorText">Border colour</label>
+          <div class="row">
+            <input type="color" id="oBorderColor" data-pair="option.border.color">
+            <input type="text" id="oBorderColorText" data-key="option.border.color" spellcheck="false">
+          </div>
+        </div>
+        <div class="field">
+          <label for="oBorderOpacity">Border opacity</label>
+          <div class="row">
+            <input type="range" id="oBorderOpacity" min="0" max="1" step="0.01" data-key="option.border.opacity" data-type="float">
+            <span class="val" data-mirror="option.border.opacity"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="oRadius">Corner radius</label>
+          <input type="number" id="oRadius" min="0" data-key="option.radius" data-type="number">
+        </div>
+        <p class="chain-warn" id="oBorderWarn" hidden></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Option — text</legend>
+        <div class="field">
+          <label for="textThemed">Follow the ambience</label>
+          <label class="check"><input type="checkbox" id="textThemed"> use <code>Theme.primaryColor</code></label>
+        </div>
+        <div class="field">
+          <label for="oTextColorText">Text colour</label>
+          <div class="row">
+            <input type="color" id="oTextColor" data-pair="option.text.color">
+            <input type="text" id="oTextColorText" data-key="option.text.color" spellcheck="false">
+          </div>
+        </div>
+        <p class="hint">Written as <code>null</code> when it follows the ambience, which is what the
+        engine default does. A fixed colour is the right choice as soon as the option background is
+        a colour of your own, since the ambience does not know about it.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Edit an existing style</legend>
+        <div class="btn-row">
+          <label class="btn" for="fileInput">Choose file…</label>
+          <input type="file" id="fileInput" accept=".json,application/json" hidden>
+          <button type="button" class="btn" id="resetBtn">Reset everything</button>
+        </div>
+        <div class="dropzone" id="dropZone">…or drop a <code>.json</code> file here</div>
+      </fieldset>
+    </form>
+
+    <!-- ============ output ============ -->
+    <div class="tool-side">
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="copyBtn">Copy JSON</button>
+        <button type="button" class="btn" id="downloadBtn">Download</button>
+        <label class="check"><input type="checkbox" id="diffOnly" checked> only changed values</label>
+      </div>
+      <pre class="json-out" id="output"></pre>
+      <p class="preview-meta" id="diffNote"></p>
+    </div>
+  </div>
 </div>
+
 <script src="../assets/js/sitemap.js"></script>
 <script src="../assets/js/nav.js"></script>
 <script src="../assets/js/cards.js"></script>
+<script src="../assets/js/engine-defaults.js"></script>
+<script src="../assets/js/tool.js"></script>
+<script>
+(function () {
+  var T        = window.VNTool;
+  var DEFAULTS = window.ENGINE_DEFAULTS.choice.style;
+  var TB_DEF   = window.ENGINE_DEFAULTS.textbox.style;
+  var REF      = window.PIXEL_RATIO_REFERENCE;
+  /* the option label uses Theme.fontSizeSmall, like both textbox labels */
+  var FONT_SIZE_SMALL = 20;
+
+  /* state --------------------------------------------------------- */
+  var state    = T.clone(DEFAULTS);   // the full, effective style
+  var baseline = T.clone(DEFAULTS);   // defaults + whatever of the chain we have
+  var parents  = {};                  // id -> { base, style }
+  var myBase   = null;
+  var chain    = [];
+  var missing  = null;
+  var cycle    = null;
+  var note     = "";
+  var meta     = { styleId: "my_choice" };
+
+  var matchStyle = null;              // resolved textbox style, for matching and the backdrop
+  var matchName  = "";
+  var matchBase  = null;              // a base we cannot resolve from one file
+
+  var form      = document.getElementById("form");
+  var output    = document.getElementById("output");
+  var styleIdEl = document.getElementById("styleId");
+  var pathHint  = document.getElementById("pathHint");
+  var diffOnly  = document.getElementById("diffOnly");
+  var diffNote  = document.getElementById("diffNote");
+  var chainBox  = document.getElementById("chainBox");
+  var deviceSel = document.getElementById("device");
+  var customBox = document.getElementById("customSize");
+  var frame     = document.getElementById("frame");
+  var tbEl      = document.getElementById("previewBox");
+  var tbInner   = document.getElementById("previewInner");
+  var cfEl      = document.getElementById("choiceFrame");
+  var cgEl      = document.getElementById("choiceGrid");
+  var optEls    = frame.querySelectorAll(".preview-option");
+  var warnEl    = document.getElementById("previewWarn");
+  var metaEl    = document.getElementById("previewMeta");
+  var matchStateEl = document.getElementById("matchState");
+  var applyBtn  = document.getElementById("applyMatch");
+  var themedChk = document.getElementById("textThemed");
+  var gBorderWarn = document.getElementById("gBorderWarn");
+  var oBorderWarn = document.getElementById("oBorderWarn");
+
+  window.DEVICE_PROFILES.forEach(function (p, i) {
+    var o = document.createElement("option");
+    o.value = i; o.textContent = p.label;
+    deviceSel.appendChild(o);
+  });
+
+  var binding = T.bindForm(form, state, render);
+
+  /* revert buttons ------------------------------------------------- */
+  var reverts = [];
+  Array.prototype.forEach.call(form.querySelectorAll("[data-key]"), function (el) {
+    var key = el.getAttribute("data-key");
+    var container = el.closest(".sub") || el.closest(".field");
+    if (!container) return;
+    if (reverts.some(function (r) { return r.key === key; })) return;
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "revert";
+    btn.innerHTML = "&#8635;";
+    btn.addEventListener("click", function () {
+      T.set(state, key, T.clone(T.get(baseline, key)));
+      binding.refresh();
+      render();
+    });
+
+    var sub = container.classList.contains("sub");
+    (sub ? container.querySelector("span") : container).appendChild(btn);
+    reverts.push({ key: key, btn: btn });
+  });
+
+  function refreshReverts() {
+    reverts.forEach(function (r) {
+      var now = T.get(state, r.key), was = T.get(baseline, r.key);
+      var changed = now !== was;
+      r.btn.className = changed ? "revert active" : "revert";
+      r.btn.disabled = !changed;
+      r.btn.title = changed
+        ? "Revert to " + (was === null ? "the ambience colour" : was)
+        : "Already at the inherited value";
+    });
+  }
+
+  /* colour pickers ------------------------------------------------- */
+  [["gBgColor", "grid.background.color"], ["gBorderColor", "grid.border.color"],
+   ["oBgColor", "option.background.color"], ["oBorderColor", "option.border.color"],
+   ["oTextColor", "option.text.color"]].forEach(function (pair) {
+    var picker = document.getElementById(pair[0]);
+    picker.addEventListener("input", function () {
+      T.set(state, pair[1], picker.value);
+      binding.refresh();
+      render();
+    });
+  });
+  Array.prototype.forEach.call(form.querySelectorAll('input[type="text"][data-key]'), function (el) {
+    el.addEventListener("blur", function () {
+      var hex = T.normaliseHex(el.value);
+      if (hex) T.set(state, el.getAttribute("data-key"), hex);
+      binding.refresh();
+      render();
+    });
+  });
+
+  /* text colour: null means "follow the ambience" ------------------- */
+  themedChk.addEventListener("change", function () {
+    if (themedChk.checked) {
+      T.set(state, "option.text.color", null);
+    } else {
+      var hex = T.normaliseHex(document.getElementById("oTextColorText").value) || "#ffffff";
+      T.set(state, "option.text.color", hex);
+    }
+    binding.refresh();
+    render();
+  });
+
+  function syncTextColourUI() {
+    var themed = state.option.text.color === null;
+    themedChk.checked = themed;
+    document.getElementById("oTextColor").disabled = themed;
+    document.getElementById("oTextColorText").disabled = themed;
+    if (themed) document.getElementById("oTextColorText").value = "null";
+  }
+
+  styleIdEl.addEventListener("input", function () {
+    meta.styleId = styleIdEl.value.trim() || "my_choice";
+    rebuildBaseline();
+    render();
+  });
+  diffOnly.addEventListener("change", render);
+  deviceSel.addEventListener("change", function () {
+    customBox.hidden = !window.DEVICE_PROFILES[deviceSel.value].custom;
+    render();
+  });
+  document.getElementById("customW").addEventListener("input", render);
+  document.getElementById("customH").addEventListener("input", render);
+
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    parents = {}; myBase = null; note = "";
+    rebuildBaseline();
+    replaceState(T.clone(baseline));
+  });
+  document.getElementById("clearParents").addEventListener("click", function () {
+    var overrides = T.diff(baseline, state);
+    parents = {}; myBase = null; note = "";
+    rebuildBaseline();
+    replaceState(T.mergeStyle(T.clone(baseline), overrides));
+  });
+
+  function replaceState(next) {
+    Object.keys(state).forEach(function (k) { delete state[k]; });
+    Object.keys(next).forEach(function (k) { state[k] = next[k]; });
+    binding.refresh();
+    render();
+  }
+
+  /* parent chain ---------------------------------------------------- */
+
+  function rebuildBaseline() {
+    chain = []; missing = null; cycle = null;
+    var self = meta.styleId;
+
+    if (myBase) {
+      var seen = {}, cur = myBase;
+      seen[self] = true;
+
+      while (cur && parents[cur] && !seen[cur]) {
+        seen[cur] = true;
+        chain.unshift(cur);
+        cur = parents[cur].base;
+      }
+
+      if (cur && seen[cur]) {
+        cycle = [self].concat(chain.slice().reverse()).concat([cur]).join(" → ");
+        chain = [];
+      } else if (cur) {
+        missing = cur;
+      }
+    }
+
+    baseline = T.clone(DEFAULTS);
+    chain.forEach(function (id) { baseline = T.mergeStyle(baseline, parents[id].style); });
+  }
+
+  function renderChainBox() {
+    if (!myBase) {
+      chainBox.className = "chain empty";
+      chainBox.textContent = "No parent — starting from the engine defaults.";
+      return;
+    }
+    chainBox.className = "chain";
+
+    if (cycle) {
+      chainBox.innerHTML =
+        '<span class="chain-link cyclic">' + cycle.split(" → ").join('</span> <span class="chain-arrow">→</span> <span class="chain-link cyclic">') + "</span>" +
+        '<p class="chain-warn"><strong>Circular inheritance.</strong> This chain leads back to ' +
+        meta.styleId + ", the style you are editing. The engine rejects a circular chain outright " +
+        "and falls back to the engine defaults, so this style would not load at all. Break the loop " +
+        "by changing one file's <code>base</code>.</p>";
+      return;
+    }
+
+    var html = '<span class="chain-link">engine defaults</span>';
+    if (missing) {
+      html += ' <span class="chain-arrow">→</span> <span class="chain-link missing">' +
+              missing + " (not uploaded)</span>";
+    }
+    chain.forEach(function (id, i) {
+      var last = i === chain.length - 1;
+      html += ' <span class="chain-arrow">→</span> <span class="chain-link' +
+              (last ? " direct" : "") + '">' + id + "</span>";
+    });
+    html += ' <span class="chain-arrow">→</span> <span class="chain-link mine">' +
+            meta.styleId + "</span>";
+
+    if (missing) {
+      html += '<p class="chain-warn">This style inherits from <strong>' + missing +
+              "</strong>, which has not been uploaded. Everything that style changes is missing " +
+              "from the preview, and values it already sets will be written into your file as if " +
+              "they were your own. Upload " + missing + ".json to fix both.</p>";
+    }
+    if (note) html += '<p class="chain-warn">' + note + "</p>";
+    chainBox.innerHTML = html;
+  }
+
+  function idFromFilename(name) { return name.replace(/\.json$/i, ""); }
+
+  document.getElementById("parentInput").addEventListener("change", function (e) {
+    var files = Array.prototype.slice.call(e.target.files);
+    if (!files.length) return;
+    var pending = files.length;
+    var overrides = T.diff(baseline, state);
+
+    files.forEach(function (f) {
+      var r = new FileReader();
+      r.onload = function () {
+        try {
+          var data = JSON.parse(r.result);
+          if (!T.isPlainObject(data) || !T.isPlainObject(data.style)) {
+            alert(f.name + " has no \"style\" block, so it is not a VNgine style file.");
+          } else {
+            parents[idFromFilename(f.name)] = {
+              base: typeof data.base === "string" ? data.base : null,
+              style: data.style
+            };
+          }
+        } catch (err) {
+          alert(f.name + " is not valid JSON:\n" + err.message);
+        }
+        if (--pending === 0) {
+          note = "";
+          if (!myBase || !parents[myBase]) {
+            var referenced = {};
+            Object.keys(parents).forEach(function (id) {
+              if (parents[id].base) referenced[parents[id].base] = true;
+            });
+            var leaves = Object.keys(parents).filter(function (id) { return !referenced[id]; });
+            if (leaves.length) {
+              myBase = leaves[0];
+              if (leaves.length > 1) {
+                note = "Several uploaded files are not inherited from (" + leaves.join(", ") +
+                       "). Using " + leaves[0] + " as the direct parent.";
+              }
+            }
+          }
+          rebuildBaseline();
+          replaceState(T.mergeStyle(T.clone(baseline), overrides));
+        }
+      };
+      r.readAsText(f);
+    });
+    e.target.value = "";
+  });
+
+  /* match a textbox style ------------------------------------------- */
+
+  function renderMatchState() {
+    if (!matchStyle) {
+      matchStateEl.className = "match-state";
+      matchStateEl.textContent = "No textbox style loaded. The preview uses the engine defaults " +
+        "for the dialogue box behind the choices.";
+      applyBtn.disabled = true;
+      return;
+    }
+    matchStateEl.className = "match-state loaded";
+    var html = "Loaded <code>" + matchName + "</code>, resolved over the textbox engine defaults. " +
+      "It is drawn behind the choices in the preview.";
+    if (matchBase) {
+      html += ' <span style="color:var(--warn)">This file inherits from <strong>' + matchBase +
+        "</strong>, which cannot be resolved here — anything the parent sets is showing as the " +
+        "engine default. Re-export it from the textbox generator with " +
+        "<em>only changed values</em> unticked to get a flat file.</span>";
+    }
+    matchStateEl.innerHTML = html;
+    applyBtn.disabled = false;
+  }
+
+  function loadMatch(data, filename) {
+    if (!T.isPlainObject(data) || !T.isPlainObject(data.style)) {
+      alert("That file has no \"style\" block, so it is not a VNgine style file.");
+      return;
+    }
+    if (data.style.grid || data.style.option) {
+      alert("That looks like a choice style, not a textbox style. Load it under " +
+            "\u201cEdit an existing style\u201d instead.");
+      return;
+    }
+    matchStyle = T.mergeStyle(T.clone(TB_DEF), data.style);
+    matchName  = idFromFilename(filename || "textbox style");
+    matchBase  = typeof data.base === "string" ? data.base : null;
+    render();
+  }
+
+  T.wireLoaders({
+    fileInput: document.getElementById("matchInput"),
+    dropZone:  document.getElementById("matchDrop"),
+    onLoad:    loadMatch
+  });
+
+  document.getElementById("clearMatch").addEventListener("click", function () {
+    matchStyle = null; matchName = ""; matchBase = null;
+    render();
+  });
+
+  applyBtn.addEventListener("click", function () {
+    if (!matchStyle) return;
+    var targets = [];
+    if (document.getElementById("tOption").checked) targets.push("option");
+    if (document.getElementById("tGrid").checked)   targets.push("grid");
+    if (!targets.length) { alert("Pick at least one target to copy onto."); return; }
+
+    var wantBg      = document.getElementById("mBackground").checked;
+    var wantBorder  = document.getElementById("mBorder").checked;
+    var wantPadding = document.getElementById("mPadding").checked;
+
+    targets.forEach(function (t) {
+      if (wantBg) {
+        T.set(state, t + ".background.color",   matchStyle.background.color);
+        T.set(state, t + ".background.opacity", matchStyle.background.opacity);
+      }
+      if (wantBorder) {
+        T.set(state, t + ".border.width",   matchStyle.border.width);
+        T.set(state, t + ".border.color",   matchStyle.border.color);
+        T.set(state, t + ".border.opacity", matchStyle.border.opacity);
+        T.set(state, t + ".radius",         matchStyle.radius);
+      }
+      if (wantPadding) {
+        T.set(state, t + ".padding", T.clone(matchStyle.padding));
+      }
+    });
+
+    binding.refresh();
+    render();
+  });
+
+  /* load the style being edited ------------------------------------ */
+  T.wireLoaders({
+    fileInput: document.getElementById("fileInput"),
+    dropZone:  document.getElementById("dropZone"),
+    onLoad: function (data, filename) {
+      if (!T.isPlainObject(data) || !T.isPlainObject(data.style)) {
+        alert("That file has no \"style\" block, so it is not a VNgine style file.");
+        return;
+      }
+      if (!data.style.grid && !data.style.option) {
+        alert("That file has no \"grid\" or \"option\" block, so it is not a choice style. " +
+              "A textbox style goes under \u201cMatch a textbox style\u201d instead.");
+        return;
+      }
+      if (filename) {
+        meta.styleId = idFromFilename(filename);
+        styleIdEl.value = meta.styleId;
+      }
+      myBase = typeof data.base === "string" ? data.base : null;
+      note = "";
+      rebuildBaseline();
+      replaceState(T.mergeStyle(T.clone(baseline), data.style));
+    }
+  });
+
+  /* output ---------------------------------------------------------- */
+  function buildOutput() {
+    var obj = {};
+    if (myBase) obj.base = myBase;
+    obj.style = diffOnly.checked ? T.diff(baseline, state) : T.clone(state);
+    return obj;
+  }
+
+  /* preview --------------------------------------------------------- */
+  function profile() {
+    var p = window.DEVICE_PROFILES[parseInt(deviceSel.value || "0", 10)];
+    if (!p.custom) return p;
+    var w = parseInt(document.getElementById("customW").value, 10) || 1080;
+    var h = parseInt(document.getElementById("customH").value, 10) || 2340;
+    return { label: "Custom", width: Math.min(w, h), height: Math.max(w, h) };
+  }
+
+  function renderPreview() {
+    var p = profile();
+    var longSide  = Math.max(p.width, p.height);
+    var shortSide = Math.min(p.width, p.height);
+    frame.style.aspectRatio = longSide + " / " + shortSide;
+
+    var frameW = frame.clientWidth;
+    var frameH = frame.clientHeight || (frameW * shortSide / longSide);
+
+    var pixelRatio = shortSide / REF;
+    var scale = (frameW / longSide) * pixelRatio;
+    var px = function (v) { return (v * scale) + "px"; };
+
+    /* --- the dialogue box behind the choices --- */
+    var tb = matchStyle || TB_DEF;
+    var tbH = frameH * tb.height;
+    tbEl.style.height = tbH + "px";
+    tbEl.style.left   = px(tb.margins.left);
+    tbEl.style.right  = px(tb.margins.right);
+    tbEl.style.top = tbEl.style.bottom = "auto";
+    if (tb.position === "top")         tbEl.style.top = px(tb.margins.top);
+    else if (tb.position === "center") tbEl.style.top = ((frameH - tbH) / 2) + "px";
+    else                               tbEl.style.bottom = px(tb.margins.bottom);
+    tbEl.style.background   = T.rgba(tb.background.color, tb.background.opacity);
+    tbEl.style.borderStyle  = "solid";
+    tbEl.style.borderWidth  = px(tb.border.width);
+    tbEl.style.borderColor  = T.rgba(tb.border.color, tb.border.opacity);
+    tbEl.style.borderRadius = px(tb.radius);
+    tbInner.style.left   = px(tb.padding.left);
+    tbInner.style.right  = px(tb.padding.right);
+    tbInner.style.top    = px(tb.padding.top);
+    tbInner.style.bottom = px(tb.padding.bottom);
+    tbInner.style.color      = "#ffffff";
+    tbInner.style.fontSize   = (FONT_SIZE_SMALL * scale) + "px";
+    tbInner.style.lineHeight = "1.2";
+
+    /* --- the choice grid --- */
+    var g = state.grid, o = state.option;
+    var availW = Math.max(0, frameW - scale * (g.margins.left + g.margins.right));
+
+    cfEl.style.width  = (availW * g.width) + "px";
+    cfEl.style.left   = "calc(50% + " + (scale * (g.margins.left - g.margins.right) / 2) + "px)";
+    cfEl.style.top    = "calc(50% + " + (scale * (g.margins.top - g.margins.bottom) / 2) + "px)";
+    /* QML draws Rectangle.border inside the rectangle without insetting its
+       children, so a CSS border-box padding has to give the border width back */
+    var gb = g.border.width;
+    cfEl.style.paddingLeft   = px(Math.max(0, g.padding.left   - gb));
+    cfEl.style.paddingRight  = px(Math.max(0, g.padding.right  - gb));
+    cfEl.style.paddingTop    = px(Math.max(0, g.padding.top    - gb));
+    cfEl.style.paddingBottom = px(Math.max(0, g.padding.bottom - gb));
+    cfEl.style.background   = T.rgba(g.background.color, g.background.opacity);
+    cfEl.style.borderWidth  = px(g.border.width);
+    cfEl.style.borderColor  = T.rgba(g.border.color, g.border.opacity);
+    cfEl.style.borderRadius = px(g.radius);
+
+    var cols = Math.max(1, g.columns | 0);
+    cgEl.style.gridTemplateColumns = "repeat(" + cols + ", minmax(0, 1fr))";
+    cgEl.style.gap = px(g.spacing);
+
+    Array.prototype.forEach.call(optEls, function (el) {
+      var ob = o.border.width;
+      el.style.paddingLeft   = px(Math.max(0, o.padding.left   - ob));
+      el.style.paddingRight  = px(Math.max(0, o.padding.right  - ob));
+      el.style.paddingTop    = px(Math.max(0, o.padding.top    - ob));
+      el.style.paddingBottom = px(Math.max(0, o.padding.bottom - ob));
+      el.style.minHeight     = px(o.min_height);
+      el.style.background    = T.rgba(o.background.color, o.background.opacity);
+      el.style.borderWidth   = px(o.border.width);
+      el.style.borderColor   = T.rgba(o.border.color, o.border.opacity);
+      el.style.borderRadius  = px(o.radius);
+      el.style.color         = o.text.color === null ? "#ffffff" : (T.normaliseHex(o.text.color) || "#ffffff");
+      el.style.fontSize      = (FONT_SIZE_SMALL * scale) + "px";
+    });
+
+    var degenerate = availW <= 0;
+    warnEl.hidden = !(missing || cycle || degenerate);
+    if (cycle)           warnEl.textContent = "Circular inheritance — this style would not load";
+    else if (missing)    warnEl.textContent = "Parent style “" + missing + "” is missing — preview incomplete";
+    else if (degenerate) warnEl.textContent = "Margins are wider than the screen — nothing left to draw in";
+
+    metaEl.textContent = "Landscape, " + longSide + "×" + shortSide +
+      " — Theme.pixelRatio ≈ " + pixelRatio.toFixed(2) + ". Approximate preview.";
+  }
+
+  /* A width with nothing visible to draw is the commonest way to lose a border:
+     opacity 0 makes it transparent, and the default colour is black on a dark scene. */
+  function borderWarning(el, b, what) {
+    if (b.width > 0 && b.opacity === 0) {
+      el.hidden = false;
+      el.innerHTML = "The " + what + " border is <strong>" + b.width +
+        " wide but fully transparent</strong>, so nothing is drawn. Raise the border opacity " +
+        "above 0, or set the width to 0 to say you meant no border.";
+      return;
+    }
+    if (b.width > 0 && b.opacity > 0 && b.opacity < 0.12) {
+      el.hidden = false;
+      el.innerHTML = "The " + what + " border opacity is " + b.opacity +
+        " — almost invisible over a dark scene.";
+      return;
+    }
+    el.hidden = true;
+  }
+
+  function render() {
+    pathHint.textContent = "assets/ui/choice/" + meta.styleId + ".json";
+    borderWarning(gBorderWarn, state.grid.border, "grid frame");
+    borderWarning(oBorderWarn, state.option.border, "option");
+    syncTextColourUI();
+    renderChainBox();
+    renderMatchState();
+    output.textContent = T.pretty(buildOutput());
+    diffNote.textContent = cycle
+      ? "Circular inheritance — the engine would reject this style."
+      : chain.length
+        ? "Unset values fall back to " + chain[chain.length - 1] + ", then to the engine defaults."
+        : "Unset values fall back to the engine defaults.";
+    refreshReverts();
+    renderPreview();
+  }
+
+  document.getElementById("copyBtn").addEventListener("click", function (e) {
+    T.copy(T.pretty(buildOutput()), e.target);
+  });
+  document.getElementById("downloadBtn").addEventListener("click", function () {
+    T.download(T.pretty(buildOutput()), meta.styleId + ".json");
+  });
+
+  window.addEventListener("resize", renderPreview);
+
+  binding.refresh();
+  render();
+})();
+</script>
 </body>
 </html>
