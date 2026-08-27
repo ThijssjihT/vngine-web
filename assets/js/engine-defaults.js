@@ -53,3 +53,24 @@ window.DEVICE_PROFILES = [
   { id: "base",        label: "Reference — 540×960",       width: 540,  height: 960 },
   { id: "custom",      label: "Custom…",                   width: 1080, height: 2340, custom: true }
 ];
+
+/* Approximate Silica Theme constants, in reference pixels (pixelRatio 1.0, a 540 px wide
+   screen). The engine never hard-codes these — QML reads Theme.* — so they exist only so a
+   preview can put things roughly where Silica would. Correct them against a device if a
+   preview ever looks visibly wrong. */
+window.SILICA_THEME = {
+  fontSizeTiny:        16,
+  fontSizeExtraSmall:  18,
+  fontSizeSmall:       20,
+  fontSizeMedium:      24,
+  fontSizeLarge:       32,
+  fontSizeExtraLarge:  48,
+  paddingSmall:         4,
+  paddingMedium:        8,
+  paddingLarge:        16,
+  horizontalPageMargin: 24,
+  itemSizeExtraSmall:  63,
+  itemSizeSmall:       80,
+  itemSizeMedium:     100,
+  itemSizeLarge:      128
+};

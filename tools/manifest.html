@@ -3,17 +3,1109 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Manifest (game.json) — VNgine</title>
+<title>Manifest generator — VNgine</title>
 <link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/tool.css">
 <script>window.SITE_BASE = "../";</script>
 </head>
 <body>
-<div class="page">
-  <h1>Manifest (game.json)</h1>
-    <div class="todo"><strong>TODO</strong> — this page has not been written yet.</div>
+<div class="page wide">
+  <p class="breadcrumb"><a href="index.html">Tools</a> / Manifest</p>
+  <h1>Manifest generator</h1>
+  <p class="lede">Builds the <code>game.json</code> that sits at the root of your game folder. Save
+  the result as <code>qml/game/game.json</code>. It names your game, says where the story starts,
+  declares the variables the script may use, and describes every control on the settings page.
+  The preview is the title screen the player sees first.</p>
+
+  <div class="tool">
+    <!-- ============ form ============ -->
+    <form id="form" autocomplete="off" onsubmit="return false;">
+
+      <fieldset>
+        <legend>Game</legend>
+        <div class="field">
+          <label for="title">Title</label>
+          <input type="text" id="title" data-key="title">
+        </div>
+        <div class="field">
+          <label for="tagline">Tagline</label>
+          <textarea id="tagline" rows="2" data-key="tagline"></textarea>
+        </div>
+        <div class="field">
+          <label for="version">Version</label>
+          <input type="text" id="version" data-key="version">
+        </div>
+        <p class="hint">Your game's version, independent of the engine version.</p>
+        <div class="field">
+          <label for="entry_scene">Entry scene</label>
+          <input type="text" id="entry_scene" data-key="entry_scene" spellcheck="false">
+        </div>
+        <p class="hint">Loaded as <code id="scenePath">script/scene_0001.json</code> when a new game starts.</p>
+        <div class="field">
+          <label for="default_language">Default language</label>
+          <input type="text" id="default_language" data-key="default_language" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="save_display_variable">Save slot label</label>
+          <input type="text" id="save_display_variable" data-key="save_display_variable"
+                 spellcheck="false" list="varNames">
+          <datalist id="varNames"></datalist>
+        </div>
+        <p class="hint">Name of the variable whose value labels each save slot. If it is not
+        declared below, the engine creates it with the value <code>"empty"</code>.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Default styles</legend>
+        <div class="field">
+          <label for="dsTextbox">Textbox</label>
+          <input type="text" id="dsTextbox" data-key="default_styles.textbox" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="dsChoice">Choice</label>
+          <input type="text" id="dsChoice" data-key="default_styles.choice" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="dsHud">HUD</label>
+          <input type="text" id="dsHud" data-key="default_styles.hud" spellcheck="false">
+        </div>
+        <p class="hint">Style ids, without the <code>.json</code> — the file lives at
+        <code>assets/ui/&lt;category&gt;/&lt;id&gt;.json</code>. Leave a box empty to start from the
+        engine defaults for that category. Build these with the
+        <a href="textbox.html">textbox</a> and <a href="choice.html">choice</a> generators.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Banner — preview only</legend>
+        <div class="btn-row">
+          <label class="btn" for="bannerInput">Choose banner.png…</label>
+          <input type="file" id="bannerInput" accept="image/png" hidden>
+          <button type="button" class="btn" id="clearBanner">Clear</button>
+          <span class="note" id="bannerState">No banner loaded.</span>
+        </div>
+        <p class="hint">The title page loads <code>qml/game/banner.png</code> by name, so only a
+        file called <code>banner.png</code> is accepted here. Nothing about the banner is written
+        into <code>game.json</code> — this is purely so the preview shows your own artwork.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Variables</legend>
+        <p class="hint">Every variable the script reads or writes should start here. The engine
+        stores the <code>default</code> when a new game begins; <code>type</code> is documentation
+        only today.</p>
+        <div class="list" id="list-variables"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" data-add="variables">Add variable</button>
+          <span class="list-count" data-count="variables"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Audio channels</legend>
+        <p class="hint">Each channel becomes a volume slider on the settings page.
+        <code>default</code> is a percentage.</p>
+        <div class="list" id="list-audio_channels"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" data-add="audio_channels">Add channel</button>
+          <span class="list-count" data-count="audio_channels"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Languages</legend>
+        <p class="hint">One selector per row. Options are separated by commas.</p>
+        <div class="list" id="list-languages"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" data-add="languages">Add selector</button>
+          <span class="list-count" data-count="languages"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Toggles</legend>
+        <div class="list" id="list-toggles"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" data-add="toggles">Add toggle</button>
+          <span class="list-count" data-count="toggles"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Dropdowns</legend>
+        <div class="list" id="list-dropdowns"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" data-add="dropdowns">Add dropdown</button>
+          <span class="list-count" data-count="dropdowns"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Text fields</legend>
+        <div class="list" id="list-textfields"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" data-add="textfields">Add text field</button>
+          <span class="list-count" data-count="textfields"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sliders</legend>
+        <div class="list" id="list-sliders"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" data-add="sliders">Add slider</button>
+          <span class="list-count" data-count="sliders"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Credits</legend>
+        <p class="hint">One block per licence or asset pack. The block name is an id — it is never
+        shown. Blocks appear on the title page in this order, one line per line you type.</p>
+        <div class="list" id="list-credits"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" data-add="credits">Add credits block</button>
+          <span class="list-count" data-count="credits"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Edit an existing game.json</legend>
+        <div class="btn-row">
+          <label class="btn" for="fileInput">Choose file…</label>
+          <input type="file" id="fileInput" accept=".json,application/json" hidden>
+          <button type="button" class="btn" id="resetBtn">Reset everything</button>
+        </div>
+        <div class="dropzone" id="dropZone">…or drop a <code>game.json</code> here</div>
+      </fieldset>
+    </form>
+
+    <!-- ============ preview + output ============ -->
+    <div class="tool-side">
+      <div class="field" style="grid-template-columns: 6rem 1fr;">
+        <label for="device">Preview on</label>
+        <select id="device"></select>
+      </div>
+      <div class="field custom-size" id="customSize" hidden style="grid-template-columns: 6rem 1fr;">
+        <label>Resolution</label>
+        <div class="row">
+          <input type="number" id="customW" min="120" value="1080"> ×
+          <input type="number" id="customH" min="120" value="2340">
+        </div>
+      </div>
+      <div class="field" style="grid-template-columns: 6rem 1fr;">
+        <label for="ambience">Ambience</label>
+        <div class="row">
+          <select id="ambience">
+            <option value="dark">dark</option>
+            <option value="light">light</option>
+          </select>
+          <input type="color" id="highlight" value="#7ba7d9" title="Theme.highlightColor">
+        </div>
+      </div>
+
+      <div class="preview-frame portrait" id="frame">
+        <div class="tp" id="tp">
+          <div class="tp-scroll" id="tpScroll">
+            <div class="tp-col" id="tpCol">
+              <div class="tp-header" id="tpHeader"><div class="tp-title" id="tpTitle"></div></div>
+              <img class="tp-banner" id="tpBanner" alt="" hidden>
+              <div class="tp-banner-placeholder" id="tpBannerPh">banner.png</div>
+              <div class="tp-sep" id="tpSep1"></div>
+              <div class="tp-text" id="tpTagline"></div>
+              <div class="tp-text" id="tpCreditsHead">Credits:</div>
+              <div class="tp-text" id="tpCredits"></div>
+            </div>
+          </div>
+          <div class="tp-fade" id="tpFade"></div>
+          <div class="tp-footer" id="tpFooter">
+            <div class="tp-sep" id="tpSep2"></div>
+            <div class="tp-footrow" id="tpFootRow">
+              <div class="tp-logo" id="tpLogo"></div>
+              <div class="tp-footcol" id="tpFootCol">
+                <div class="tp-baseline" id="tpBaseline">
+                  <span id="tpEngine">VNgine</span><span id="tpVersion">v0.2.0</span>
+                </div>
+                <div id="tpAuthor">By Thijs Janssen</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="preview-meta" id="previewMeta"></p>
+
+      <div class="notices" id="notices"></div>
+
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="copyBtn">Copy JSON</button>
+        <button type="button" class="btn" id="downloadBtn">Download game.json</button>
+      </div>
+      <pre class="json-out" id="output"></pre>
+    </div>
+  </div>
 </div>
+
 <script src="../assets/js/sitemap.js"></script>
 <script src="../assets/js/nav.js"></script>
 <script src="../assets/js/cards.js"></script>
+<script src="../assets/js/engine-defaults.js"></script>
+<script src="../assets/js/tool.js"></script>
+<script>
+(function () {
+  var T   = window.VNTool;
+  var TH  = window.SILICA_THEME;
+  var REF = window.PIXEL_RATIO_REFERENCE;
+
+  /* The four-of-each design limit from the manifest guide. The engine does not
+     enforce it, so neither does this — going over only raises a notice. */
+  var SOFT_LIMIT = 4;
+  var KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;   /* GameEngine.js interpolate() */
+
+  /* ---------------------------------------------------------------- state */
+
+  function starterState() {
+    return {
+      title: "My game",
+      version: "0.1.0",
+      default_language: "en",
+      entry_scene: "scene_0001",
+      save_display_variable: "chapter_title",
+      tagline: "One line about the game, shown under the banner.",
+      default_styles: { textbox: "", choice: "", hud: "" }
+    };
+  }
+
+  function starterLists() {
+    return {
+      variables:      [{ key: "chapter_title", type: "string", "default": "Prologue" }],
+      audio_channels: [{ key: "music", label: "Music", "default": 80 }],
+      languages:      [],
+      toggles:        [],
+      dropdowns:      [],
+      textfields:     [],
+      sliders:        [],
+      credits:        [{ key: "game_licence", lines: ["Written by you"] }]
+    };
+  }
+
+  function emptyLists() {
+    return { variables: [], audio_channels: [], languages: [], toggles: [],
+             dropdowns: [], textfields: [], sliders: [], credits: [] };
+  }
+
+  var state  = starterState();
+  var lists  = starterLists();
+  var extras      = {};       /* top-level keys we do not model, preserved verbatim */
+  var extraStyles = {};       /* default_styles categories we do not model */
+  var banner      = null;     /* data URL, preview only */
+
+  /* --------------------------------------------------------- list schemas */
+  /* Field types:
+       text | number | check | options | optdefault | vartype | vardefault | lines */
+
+  var SPECS = {
+    variables: {
+      grid: "minmax(0,1.1fr) 6.5rem minmax(0,1.2fr)",
+      limit: null,
+      fields: [
+        { name: "key",     label: "name",    type: "text" },
+        { name: "type",    label: "type",    type: "vartype" },
+        { name: "default", label: "default", type: "vardefault" }
+      ],
+      make: function () { return { key: "", type: "int", "default": 0 }; },
+      toJson: function (e) { return { type: e.type, "default": e["default"] }; },
+      fromJson: function (k, v) {
+        v = T.isPlainObject(v) ? v : {};
+        var type = typeof v.type === "string" ? v.type : guessType(v["default"]);
+        return { key: k, type: type,
+                 "default": v["default"] === undefined ? coerce(type, "") : v["default"] };
+      }
+    },
+
+    audio_channels: {
+      grid: "minmax(0,1fr) minmax(0,1fr) 6rem",
+      limit: null,
+      fields: [
+        { name: "key",     label: "key",   type: "text" },
+        { name: "label",   label: "label", type: "text" },
+        { name: "default", label: "0–100", type: "number", min: 0, max: 100, step: 1 }
+      ],
+      make: function () { return { key: "", label: "", "default": 80 }; },
+      toJson: function (e) { return { label: e.label, "default": e["default"] }; },
+      fromJson: function (k, v) {
+        v = T.isPlainObject(v) ? v : {};
+        return { key: k, label: str(v.label), "default": num(v["default"], 80) };
+      }
+    },
+
+    languages: {
+      grid: "minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.3fr) minmax(0,.9fr)",
+      limit: null,
+      fields: [
+        { name: "key",     label: "key",             type: "text" },
+        { name: "label",   label: "label",           type: "text" },
+        { name: "options", label: "options, commas", type: "options" },
+        { name: "default", label: "default",         type: "optdefault" }
+      ],
+      make: function () { return { key: "", label: "", options: [], "default": "" }; },
+      toJson: function (e) { return { label: e.label, options: e.options.slice(), "default": e["default"] }; },
+      fromJson: function (k, v) {
+        v = T.isPlainObject(v) ? v : {};
+        return { key: k, label: str(v.label), options: arr(v.options), "default": str(v["default"]) };
+      }
+    },
+
+    toggles: {
+      grid: "minmax(0,1fr) minmax(0,1.4fr) 3.5rem",
+      limit: SOFT_LIMIT,
+      fields: [
+        { name: "key",     label: "key",   type: "text" },
+        { name: "label",   label: "label", type: "text" },
+        { name: "default", label: "on",    type: "check" }
+      ],
+      make: function () { return { key: "", label: "", "default": false }; },
+      toJson: function (e) { return { label: e.label, "default": !!e["default"] }; },
+      fromJson: function (k, v) {
+        v = T.isPlainObject(v) ? v : {};
+        return { key: k, label: str(v.label), "default": !!v["default"] };
+      }
+    },
+
+    dropdowns: {
+      grid: "minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.3fr) minmax(0,.9fr)",
+      limit: SOFT_LIMIT,
+      fields: [
+        { name: "key",     label: "key",             type: "text" },
+        { name: "label",   label: "label",           type: "text" },
+        { name: "options", label: "options, commas", type: "options" },
+        { name: "default", label: "default",         type: "optdefault" }
+      ],
+      make: function () { return { key: "", label: "", options: [], "default": "" }; },
+      toJson: function (e) { return { label: e.label, options: e.options.slice(), "default": e["default"] }; },
+      fromJson: function (k, v) {
+        v = T.isPlainObject(v) ? v : {};
+        return { key: k, label: str(v.label), options: arr(v.options), "default": str(v["default"]) };
+      }
+    },
+
+    textfields: {
+      grid: "minmax(0,.9fr) minmax(0,1.4fr) minmax(0,1.1fr)",
+      limit: SOFT_LIMIT,
+      fields: [
+        { name: "key",     label: "key",     type: "text" },
+        { name: "label",   label: "label",   type: "text" },
+        { name: "default", label: "default", type: "text" }
+      ],
+      make: function () { return { key: "", label: "", "default": "" }; },
+      toJson: function (e) { return { label: e.label, "default": e["default"] }; },
+      fromJson: function (k, v) {
+        v = T.isPlainObject(v) ? v : {};
+        return { key: k, label: str(v.label), "default": str(v["default"]) };
+      }
+    },
+
+    sliders: {
+      grid: "minmax(0,1fr) minmax(0,1.2fr) 4.2rem 4.2rem 4.2rem 4.2rem",
+      limit: SOFT_LIMIT,
+      fields: [
+        { name: "key",      label: "key",     type: "text" },
+        { name: "label",    label: "label",   type: "text" },
+        { name: "min",      label: "min",     type: "number" },
+        { name: "max",      label: "max",     type: "number" },
+        { name: "stepsize", label: "step",    type: "number" },
+        { name: "default",  label: "default", type: "number" }
+      ],
+      make: function () { return { key: "", label: "", min: 0, max: 100, stepsize: 1, "default": 50 }; },
+      toJson: function (e) {
+        return { label: e.label, min: e.min, max: e.max, stepsize: e.stepsize, "default": e["default"] };
+      },
+      fromJson: function (k, v) {
+        v = T.isPlainObject(v) ? v : {};
+        return { key: k, label: str(v.label), min: num(v.min, 0), max: num(v.max, 100),
+                 stepsize: num(v.stepsize, 1), "default": num(v["default"], 0) };
+      }
+    },
+
+    credits: {
+      grid: "minmax(0,.8fr) minmax(0,2.4fr)",
+      limit: null,
+      fields: [
+        { name: "key",   label: "block name",    type: "text" },
+        { name: "lines", label: "one line each", type: "lines" }
+      ],
+      make: function () { return { key: "", lines: [] }; },
+      toJson: function (e) { return e.lines.slice(); },
+      fromJson: function (k, v) {
+        return { key: k, lines: Array.isArray(v) ? v.map(String) : (v == null ? [] : [String(v)]) };
+      }
+    }
+  };
+
+  /* Written in the order the sample game.json uses. */
+  var COLLECTIONS = ["audio_channels", "languages", "toggles", "dropdowns",
+                     "textfields", "sliders", "variables"];
+  var LIST_ORDER  = COLLECTIONS.concat(["credits"]);
+
+  /* The namespace GameEngine.interpolate() and Settings._keyIndex share. */
+  var SETTING_LISTS = ["toggles", "dropdowns", "textfields", "sliders"];
+
+  /* ---------------------------------------------------------- small utils */
+
+  function str(v)    { return v === undefined || v === null ? "" : String(v); }
+  function num(v, d) { var n = parseFloat(v); return isNaN(n) ? (d === undefined ? 0 : d) : n; }
+  function arr(v)    { return Array.isArray(v) ? v.map(String) : []; }
+  function el(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function guessType(v) {
+    if (typeof v === "boolean") return "bool";
+    if (typeof v === "number")  return v % 1 === 0 ? "int" : "float";
+    return "string";
+  }
+
+  function coerce(type, v) {
+    if (type === "bool")  return v === true || v === "true" || v === 1;
+    if (type === "int")   return Math.round(num(v, 0));
+    if (type === "float") return num(v, 0);
+    return str(v);
+  }
+
+  function label(name) {
+    return { variables: "Variables", audio_channels: "Audio channels", languages: "Languages",
+             toggles: "Toggles", dropdowns: "Dropdowns", textfields: "Text fields",
+             sliders: "Sliders", credits: "Credits" }[name] || name;
+  }
+
+  /* ------------------------------------------------------------- elements */
+
+  var form        = document.getElementById("form");
+  var output      = document.getElementById("output");
+  var noticeBox   = document.getElementById("notices");
+  var deviceSel   = document.getElementById("device");
+  var customBox   = document.getElementById("customSize");
+  var ambienceSel = document.getElementById("ambience");
+  var highlightEl = document.getElementById("highlight");
+  var frame       = document.getElementById("frame");
+  var metaEl      = document.getElementById("previewMeta");
+  var scenePath   = document.getElementById("scenePath");
+  var varNames    = document.getElementById("varNames");
+  var bannerImg   = document.getElementById("tpBanner");
+  var bannerPh    = document.getElementById("tpBannerPh");
+  var bannerState = document.getElementById("bannerState");
+
+  window.DEVICE_PROFILES.forEach(function (p, i) {
+    var o = el("option");
+    o.value = i; o.textContent = p.label;
+    deviceSel.appendChild(o);
+  });
+
+  /* Bound once, to one object that is never replaced — only refilled. */
+  var binding = T.bindForm(form, state, render);
+
+  function replaceState(next) {
+    Object.keys(state).forEach(function (k) { delete state[k]; });
+    Object.keys(next).forEach(function (k) { state[k] = next[k]; });
+    binding.refresh();
+  }
+
+  /* --------------------------------------------------------- list editing */
+
+  function buildCell(entry, field, row, listName) {
+    var cell = el("div", "cell");
+    var cap  = el("span");
+    cap.textContent = field.label;
+    var input;
+
+    function commit(v) { entry[field.name] = v; render(); }
+
+    switch (field.type) {
+
+      case "check":
+        cell.className = "cell check-cell";
+        input = el("input");
+        input.type = "checkbox";
+        input.checked = !!entry[field.name];
+        input.addEventListener("change", function () { commit(input.checked); });
+        break;
+
+      case "number":
+        input = el("input");
+        input.type = "number";
+        if (field.min !== undefined)  input.min  = field.min;
+        if (field.max !== undefined)  input.max  = field.max;
+        if (field.step !== undefined) input.step = field.step;
+        input.value = entry[field.name];
+        input.addEventListener("input", function () { commit(num(input.value, 0)); });
+        break;
+
+      case "options":
+        input = el("input");
+        input.type = "text";
+        input.spellcheck = false;
+        input.value = entry.options.join(", ");
+        input.addEventListener("input", function () {
+          entry.options = input.value.split(",").map(function (s) { return s.trim(); })
+                               .filter(function (s) { return s.length; });
+          refreshOptDefaults(row, entry);
+          render();
+        });
+        break;
+
+      case "optdefault":
+        input = el("select");
+        input.setAttribute("data-role", "optdefault");
+        fillOptDefault(input, entry);
+        input.addEventListener("change", function () { commit(input.value); });
+        break;
+
+      case "vartype":
+        input = el("select");
+        ["int", "float", "string", "bool"].forEach(function (t) {
+          var o = el("option"); o.value = t; o.textContent = t; input.appendChild(o);
+        });
+        input.value = entry.type;
+        input.addEventListener("change", function () {
+          entry.type = input.value;
+          entry["default"] = coerce(entry.type, entry["default"]);
+          renderList(listName);          /* the default editor changes shape */
+          render();
+        });
+        break;
+
+      case "vardefault":
+        if (entry.type === "bool") {
+          cell.className = "cell check-cell";
+          input = el("input");
+          input.type = "checkbox";
+          input.checked = !!entry["default"];
+          input.addEventListener("change", function () { commit(input.checked); });
+        } else if (entry.type === "int" || entry.type === "float") {
+          input = el("input");
+          input.type = "number";
+          if (entry.type === "int") input.step = 1;
+          input.value = entry["default"];
+          input.addEventListener("input", function () { commit(coerce(entry.type, input.value)); });
+        } else {
+          input = el("input");
+          input.type = "text";
+          input.value = str(entry["default"]);
+          input.addEventListener("input", function () { commit(input.value); });
+        }
+        break;
+
+      case "lines":
+        input = el("textarea");
+        input.rows = Math.max(2, entry.lines.length);
+        input.value = entry.lines.join("\n");
+        input.addEventListener("input", function () {
+          entry.lines = input.value.split("\n");
+          render();
+        });
+        break;
+
+      default:
+        input = el("input");
+        input.type = "text";
+        input.spellcheck = false;
+        input.value = str(entry[field.name]);
+        input.addEventListener("input", function () { commit(input.value); });
+    }
+
+    cell.appendChild(cap);
+    cell.appendChild(input);
+    return cell;
+  }
+
+  /* The default of a language or dropdown is one of its own options. An option
+     that no longer exists is kept in the list, marked, so loading a file that
+     disagrees with itself does not quietly rewrite it. */
+  function fillOptDefault(sel, entry) {
+    sel.innerHTML = "";
+    if (!entry.options.length && !entry["default"]) {
+      var none = el("option");
+      none.value = ""; none.textContent = "—";
+      sel.appendChild(none);
+    }
+    var opts = entry.options.slice();
+    if (entry["default"] && opts.indexOf(entry["default"]) === -1) opts.push(entry["default"]);
+    opts.forEach(function (o) {
+      var opt = el("option");
+      opt.value = o;
+      opt.textContent = entry.options.indexOf(o) === -1 ? o + " (not an option)" : o;
+      sel.appendChild(opt);
+    });
+    if (!entry["default"] && entry.options.length) entry["default"] = entry.options[0];
+    sel.value = entry["default"] || "";
+  }
+
+  function refreshOptDefaults(row, entry) {
+    Array.prototype.forEach.call(row.querySelectorAll('select[data-role="optdefault"]'),
+      function (sel) { fillOptDefault(sel, entry); });
+  }
+
+  function renderList(name) {
+    var spec = SPECS[name];
+    var box  = document.getElementById("list-" + name);
+    box.innerHTML = "";
+
+    if (!lists[name].length) {
+      var empty = el("p", "list-empty");
+      empty.textContent = "None.";
+      box.appendChild(empty);
+      return;
+    }
+
+    lists[name].forEach(function (entry, index) {
+      var row = el("div", "list-row");
+      row.style.gridTemplateColumns = spec.grid + " auto";
+      spec.fields.forEach(function (f) { row.appendChild(buildCell(entry, f, row, name)); });
+
+      var rm = el("button", "rm");
+      rm.type = "button";
+      rm.innerHTML = "&times;";
+      rm.title = "Remove";
+      rm.addEventListener("click", function () {
+        lists[name].splice(index, 1);
+        renderList(name);
+        render();
+      });
+      row.appendChild(rm);
+      box.appendChild(row);
+    });
+  }
+
+  function renderAllLists() { LIST_ORDER.forEach(renderList); }
+
+  Array.prototype.forEach.call(form.querySelectorAll("[data-add]"), function (btn) {
+    var name = btn.getAttribute("data-add");
+    btn.addEventListener("click", function () {
+      lists[name].push(SPECS[name].make());
+      renderList(name);
+      render();
+    });
+  });
+
+  /* ------------------------------------------------------------- the file */
+
+  /* A row with no key, or two rows with the same key, would vanish into one
+     object entry. Give it a name instead and let the notices complain. */
+  function keysFor(name) {
+    var seen = {};
+    return lists[name].map(function (e, i) {
+      var key = (e.key || "").trim() || (name === "credits" ? "block_" : name + "_") + (i + 1);
+      while (seen[key]) key += "_";
+      seen[key] = true;
+      return key;
+    });
+  }
+
+  function collection(name) {
+    var spec = SPECS[name], keys = keysFor(name), out = {};
+    lists[name].forEach(function (e, i) { out[keys[i]] = spec.toJson(e); });
+    return out;
+  }
+
+  function creditsBlock() {
+    var keys = keysFor("credits"), out = {};
+    lists.credits.forEach(function (e, i) {
+      var lines = e.lines.slice();
+      while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+      out[keys[i]] = lines;
+    });
+    return out;
+  }
+
+  function buildOutput() {
+    var o = {};
+    o.title   = state.title;
+    o.version = state.version;
+    if (state.default_language) o.default_language = state.default_language;
+    o.entry_scene = state.entry_scene;
+    if (state.save_display_variable) o.save_display_variable = state.save_display_variable;
+
+    var ds = {};
+    ["textbox", "choice", "hud"].forEach(function (c) {
+      var v = (state.default_styles[c] || "").trim();
+      if (v) ds[c] = v;
+    });
+    Object.keys(extraStyles).forEach(function (c) { if (!(c in ds)) ds[c] = extraStyles[c]; });
+    if (Object.keys(ds).length) o.default_styles = ds;
+
+    COLLECTIONS.forEach(function (name) {
+      if (lists[name].length) o[name] = collection(name);
+    });
+
+    if (state.tagline) o.tagline = state.tagline;
+    if (lists.credits.length) o.credits = creditsBlock();
+
+    /* keys this generator does not model, kept exactly as they were loaded */
+    Object.keys(extras).forEach(function (k) { if (!(k in o)) o[k] = extras[k]; });
+    return o;
+  }
+
+  /* -------------------------------------------------------------- notices */
+
+  function checkNotices() {
+    var out = [], owner = {};
+
+    if (!state.title.trim())
+      out.push(["warn", "No title — the title page header would be empty."]);
+    if (!state.entry_scene.trim())
+      out.push(["warn", "No entry scene. The engine has nothing to load when a new game starts."]);
+    else if (!/^[A-Za-z0-9_\-]+$/.test(state.entry_scene.trim()))
+      out.push(["warn", "Entry scene <code>" + esc(state.entry_scene) +
+                "</code> is not a plain file name — it is used as <code>script/&lt;id&gt;.json</code>."]);
+
+    /* variables and the four settings lists share one lookup namespace */
+    ["variables"].concat(SETTING_LISTS).forEach(function (name) {
+      var unnamed = 0;
+      lists[name].forEach(function (e) {
+        var k = (e.key || "").trim();
+        if (!k) { unnamed++; return; }
+        if (!KEY_RE.test(k))
+          out.push(["warn", "<code>" + esc(k) + "</code> cannot be used in text. <code>%" +
+                    esc(k) + "%</code> only matches letters, digits and underscores, starting " +
+                    "with a letter or an underscore."]);
+        if (owner[k])
+          out.push(["warn", "<code>" + esc(k) + "</code> is declared twice — " + owner[k] +
+                    " and " + label(name) + ". Variables and settings share one namespace, so " +
+                    "one of them shadows the other when the script reads it."]);
+        else owner[k] = label(name);
+      });
+      if (unnamed) out.push(["warn", unnamed + (unnamed === 1 ? " row" : " rows") + " under " +
+                             label(name) + " " + (unnamed === 1 ? "has" : "have") +
+                             " no key, so " + (unnamed === 1 ? "it gets" : "they get") +
+                             " a generated name in the file."]);
+    });
+
+    ["audio_channels", "languages"].forEach(function (name) {
+      var seen = {}, unnamed = 0;
+      lists[name].forEach(function (e) {
+        var k = (e.key || "").trim();
+        if (!k) { unnamed++; return; }
+        if (seen[k]) out.push(["warn", "<code>" + esc(k) + "</code> appears twice under " + label(name) + "."]);
+        seen[k] = true;
+      });
+      if (unnamed) out.push(["warn", unnamed + (unnamed === 1 ? " row" : " rows") + " under " +
+                             label(name) + " " + (unnamed === 1 ? "has" : "have") + " no key."]);
+    });
+
+    SETTING_LISTS.forEach(function (name) {
+      if (lists[name].length > SOFT_LIMIT)
+        out.push(["warn", label(name) + ": " + lists[name].length + " entries, over the " +
+                  SOFT_LIMIT + "-of-each design limit. The engine does not enforce it, so this " +
+                  "loads and runs — the settings page just gets crowded."]);
+    });
+
+    ["languages", "dropdowns"].forEach(function (name) {
+      lists[name].forEach(function (e) {
+        var k = esc(e.key || "(unnamed)");
+        if (!e.options.length) out.push(["warn", "<code>" + k + "</code> has no options."]);
+        else if (e.options.indexOf(e["default"]) === -1)
+          out.push(["warn", "<code>" + k + "</code>: the default “" + esc(e["default"]) +
+                    "” is not one of its options."]);
+      });
+    });
+
+    lists.sliders.forEach(function (e) {
+      var k = esc(e.key || "(unnamed)");
+      if (e.min >= e.max)  out.push(["warn", "Slider <code>" + k + "</code>: min is not below max."]);
+      if (e.stepsize <= 0) out.push(["warn", "Slider <code>" + k + "</code>: the step size must be above zero."]);
+      if (e["default"] < e.min || e["default"] > e.max)
+        out.push(["warn", "Slider <code>" + k + "</code>: the default sits outside min–max."]);
+    });
+
+    lists.audio_channels.forEach(function (e) {
+      if (e["default"] < 0 || e["default"] > 100)
+        out.push(["warn", "Audio channel <code>" + esc(e.key || "(unnamed)") +
+                  "</code>: the default is a percentage, 0–100."]);
+    });
+
+    var sdv = state.save_display_variable.trim();
+    if (sdv && !lists.variables.some(function (e) { return e.key.trim() === sdv; }))
+      out.push(["info", "<code>" + esc(sdv) + "</code> is not declared under Variables. The " +
+                "engine creates it with the value <code>\"empty\"</code>, so every save slot " +
+                "reads “empty” until the script sets it."]);
+
+    var extraKeys = Object.keys(extras).concat(
+      Object.keys(extraStyles).map(function (c) { return "default_styles." + c; }));
+    if (extraKeys.length)
+      out.push(["info", "Kept from the file you loaded, unchanged and not editable here: <code>" +
+                extraKeys.map(esc).join("</code>, <code>") + "</code>."]);
+
+    noticeBox.innerHTML = "";
+    out.forEach(function (n) {
+      var p = el("p", "notice " + n[0]);
+      p.innerHTML = n[1];
+      noticeBox.appendChild(p);
+    });
+  }
+
+  /* -------------------------------------------------------------- preview */
+
+  function profile() {
+    var p = window.DEVICE_PROFILES[parseInt(deviceSel.value || "0", 10)];
+    if (!p.custom) return p;
+    var w = parseInt(document.getElementById("customW").value, 10) || 1080;
+    var h = parseInt(document.getElementById("customH").value, 10) || 2340;
+    return { label: "Custom", width: Math.min(w, h), height: Math.max(w, h) };
+  }
+
+  /* TitlePage.qml joins the lines of a block with a newline, and the blocks
+     with a blank line between them. */
+  function creditsText() {
+    var sections = [];
+    lists.credits.forEach(function (b) {
+      var lines = b.lines.slice();
+      while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+      if (lines.length) sections.push(lines.join("\n"));
+    });
+    return sections.join("\n\n");
+  }
+
+  function updateFade() {
+    var scroll = document.getElementById("tpScroll");
+    var fade   = document.getElementById("tpFade");
+    var more   = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop > 1;
+    fade.style.display = more ? "block" : "none";
+  }
+  document.getElementById("tpScroll").addEventListener("scroll", updateFade);
+
+  function renderPreview() {
+    var p = profile();
+    var shortSide = Math.min(p.width, p.height);
+    var longSide  = Math.max(p.width, p.height);
+    frame.style.aspectRatio = shortSide + " / " + longSide;
+
+    var frameW = frame.clientWidth || 320;
+    /* Theme.pixelRatio is shortSide / 540, and the frame maps shortSide device
+       pixels onto frameW CSS pixels, so the two cancel: one factor covers both. */
+    var scale = frameW / REF;
+    function px(v) { return (v * scale) + "px"; }
+
+    var dark      = ambienceSel.value === "dark";
+    var bg        = dark ? "#000000" : "#ffffff";
+    var primary   = dark ? "rgba(255,255,255,.85)" : "rgba(0,0,0,.85)";
+    var secondary = dark ? "rgba(255,255,255,.45)" : "rgba(0,0,0,.45)";
+    var highlight = highlightEl.value;
+    var margin    = px(TH.horizontalPageMargin);
+
+    document.getElementById("tp").style.background = bg;
+
+    var header = document.getElementById("tpHeader");
+    header.style.height        = px(TH.itemSizeLarge);
+    header.style.paddingRight  = margin;
+    header.style.paddingBottom = px(TH.paddingMedium);
+
+    var titleEl = document.getElementById("tpTitle");
+    titleEl.textContent      = state.title || "Title";
+    titleEl.style.color      = state.title ? primary : secondary;
+    titleEl.style.fontSize   = px(TH.fontSizeLarge);
+    titleEl.style.lineHeight = "1.2";
+
+    document.getElementById("tpCol").style.gap = px(TH.paddingLarge);
+
+    bannerImg.hidden = !banner;
+    bannerPh.hidden  = !!banner;
+    if (banner && bannerImg.getAttribute("src") !== banner) bannerImg.src = banner;
+    bannerPh.style.fontSize    = px(TH.fontSizeExtraSmall);
+    bannerPh.style.color       = secondary;
+    bannerPh.style.borderColor = secondary;
+
+    [document.getElementById("tpSep1"), document.getElementById("tpSep2")].forEach(function (s) {
+      s.style.background = primary;
+    });
+
+    function textBlock(id, text, colour, size) {
+      var e = document.getElementById(id);
+      e.textContent = text;
+      e.style.color = colour;
+      e.style.fontSize = px(size);
+      e.style.lineHeight = "1.3";
+      e.style.paddingLeft = margin;
+      e.style.paddingRight = margin;
+    }
+    textBlock("tpTagline",     state.tagline || "", highlight, TH.fontSizeMedium);
+    textBlock("tpCreditsHead", "Credits:",          primary,   TH.fontSizeSmall);
+    textBlock("tpCredits",     creditsText(),       secondary, TH.fontSizeSmall);
+
+    var footer = document.getElementById("tpFooter");
+    footer.style.padding    = "0 " + margin;
+    footer.style.gap        = px(TH.paddingMedium);
+    footer.style.display    = "flex";
+    footer.style.flexDirection = "column";
+
+    var footRow = document.getElementById("tpFootRow");
+    footRow.style.gap = px(TH.paddingMedium);
+    footRow.style.paddingBottom = px(TH.paddingLarge);
+
+    var logo = document.getElementById("tpLogo");
+    logo.style.width = logo.style.height = px(TH.itemSizeMedium);
+
+    document.getElementById("tpFootCol").style.gap  = px(TH.paddingSmall);
+    document.getElementById("tpBaseline").style.gap = px(TH.paddingSmall);
+
+    var engineEl = document.getElementById("tpEngine");
+    engineEl.style.color    = highlight;
+    engineEl.style.fontSize = px(TH.fontSizeSmall);
+
+    var versionEl = document.getElementById("tpVersion");
+    versionEl.style.color    = secondary;
+    versionEl.style.fontSize = px(TH.fontSizeExtraSmall);
+
+    var authorEl = document.getElementById("tpAuthor");
+    authorEl.style.color    = primary;
+    authorEl.style.fontSize = px(TH.fontSizeSmall);
+
+    /* the QML hint is visible only while there is something further down */
+    var fade = document.getElementById("tpFade");
+    fade.style.height     = px(TH.itemSizeSmall);
+    fade.style.bottom     = document.getElementById("tpFooter").offsetHeight + "px";
+    fade.style.background = "linear-gradient(to bottom, transparent, " + bg + ")";
+    updateFade();
+
+    metaEl.textContent = "Portrait, " + shortSide + "×" + longSide +
+      " — Theme.pixelRatio ≈ " + (shortSide / REF).toFixed(2) +
+      ". Only the aspect ratio changes between devices; pixelRatio cancels against the frame " +
+      "width. Approximate preview.";
+  }
+
+  /* --------------------------------------------------------------- render */
+
+  function render() {
+    scenePath.textContent = "script/" + (state.entry_scene || "scene_0001") + ".json";
+
+    varNames.innerHTML = "";
+    lists.variables.forEach(function (v) {
+      if (!v.key) return;
+      var o = el("option"); o.value = v.key; varNames.appendChild(o);
+    });
+
+    LIST_ORDER.forEach(function (name) {
+      var counter = form.querySelector('[data-count="' + name + '"]');
+      if (!counter) return;
+      var n = lists[name].length, lim = SPECS[name].limit;
+      counter.textContent = lim ? n + " of " + lim : (n === 1 ? "1 entry" : n + " entries");
+      counter.className = "list-count" + (lim && n > lim ? " over" : "");
+    });
+
+    output.textContent = T.pretty(buildOutput());
+    checkNotices();
+    renderPreview();
+  }
+
+  /* ---------------------------------------------------------- load / save */
+
+  var KNOWN_SCALARS = ["title", "version", "default_language", "entry_scene",
+                       "save_display_variable", "tagline"];
+
+  function loadManifest(data) {
+    if (!T.isPlainObject(data)) {
+      alert("That file is not a JSON object, so it is not a VNgine manifest.");
+      return;
+    }
+
+    var next   = starterState();
+    lists       = emptyLists();
+    extras      = {};
+    extraStyles = {};
+
+    KNOWN_SCALARS.forEach(function (k) {
+      next[k] = data[k] === undefined ? "" : String(data[k]);
+    });
+
+    next.default_styles = { textbox: "", choice: "", hud: "" };
+    if (T.isPlainObject(data.default_styles)) {
+      Object.keys(data.default_styles).forEach(function (c) {
+        if (c in next.default_styles) next.default_styles[c] = String(data.default_styles[c]);
+        else extraStyles[c] = data.default_styles[c];
+      });
+    }
+
+    LIST_ORDER.forEach(function (name) {
+      var block = data[name];
+      if (!T.isPlainObject(block)) return;
+      Object.keys(block).forEach(function (k) {
+        lists[name].push(SPECS[name].fromJson(k, block[k]));
+      });
+    });
+
+    var known = KNOWN_SCALARS.concat(LIST_ORDER).concat(["default_styles"]);
+    Object.keys(data).forEach(function (k) {
+      if (known.indexOf(k) === -1) extras[k] = data[k];
+    });
+
+    replaceState(next);
+    renderAllLists();
+    render();
+  }
+
+  T.wireLoaders({
+    fileInput: document.getElementById("fileInput"),
+    dropZone:  document.getElementById("dropZone"),
+    onLoad: function (data) { loadManifest(data); }
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    lists       = starterLists();
+    extras      = {};
+    extraStyles = {};
+    replaceState(starterState());
+    renderAllLists();
+    render();
+  });
+
+  /* --------------------------------------------------------------- banner */
+
+  document.getElementById("bannerInput").addEventListener("change", function (e) {
+    var f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    if (f.name !== "banner.png") {
+      bannerState.textContent = "“" + f.name + "” rejected — the file must be named banner.png.";
+      return;
+    }
+    var r = new FileReader();
+    r.onload = function () {
+      banner = r.result;
+      bannerState.textContent = "banner.png loaded — preview only.";
+      render();
+    };
+    r.readAsDataURL(f);
+  });
+
+  document.getElementById("clearBanner").addEventListener("click", function () {
+    banner = null;
+    bannerImg.removeAttribute("src");
+    bannerState.textContent = "No banner loaded.";
+    render();
+  });
+
+  /* --------------------------------------------------------------- wiring */
+
+  deviceSel.addEventListener("change", function () {
+    customBox.hidden = !window.DEVICE_PROFILES[deviceSel.value].custom;
+    renderPreview();
+  });
+  document.getElementById("customW").addEventListener("input", renderPreview);
+  document.getElementById("customH").addEventListener("input", renderPreview);
+  ambienceSel.addEventListener("change", renderPreview);
+  highlightEl.addEventListener("input", renderPreview);
+
+  document.getElementById("copyBtn").addEventListener("click", function (e) {
+    T.copy(T.pretty(buildOutput()), e.target);
+  });
+  document.getElementById("downloadBtn").addEventListener("click", function () {
+    T.download(T.pretty(buildOutput()), "game.json");
+  });
+
+  window.addEventListener("resize", renderPreview);
+
+  binding.refresh();
+  renderAllLists();
+  render();
+})();
+</script>
 </body>
 </html>
