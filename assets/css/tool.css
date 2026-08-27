@@ -270,13 +270,16 @@ fieldset > .hint { font-size: .8rem; color: var(--fg-faint); margin: .4rem 0 0; 
 .tool-preview .preview-head label { font-size: .82rem; color: var(--fg-dim); }
 .tool-preview .preview-head select { width: auto; min-width: 15rem; }
 .tool-preview .preview-head .row input { max-width: 6rem; }
-/* sized by height so the landscape frame gets as wide as the page allows */
+/* Width drives height through aspect-ratio, as in the base rule. The cap is a
+   max-width set inline by the page, computed from the wanted height and the
+   device aspect — setting height here instead would make both dimensions
+   definite, and aspect-ratio would be ignored. */
 .tool-preview .preview-frame {
-  width: auto;
-  max-width: 100%;
-  height: clamp(190px, 40vh, 470px);
+  width: 100%;
+  height: auto;
   margin: 0 auto;
 }
+.tool-preview .preview-head #previewSize { width: 8rem; }
 .tool-preview .preview-meta { margin-top: .45rem; }
 
 @media (max-width: 1000px) {
