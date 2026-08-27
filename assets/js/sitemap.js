@@ -67,8 +67,8 @@ window.SITE_MAP = {
       blurb: "Title, entry scene, variables, credits and the whole settings page, previewed on the title screen." },
     { title: "Settings",          path: "tools/settings.html",  status: "planned",
       blurb: "Definitions for the in-game settings page." },
-    { title: "Scene script",      path: "tools/scene.html",     status: "planned",
-      blurb: "Build a scene command list without hand-writing JSON." },
+    { title: "Scene script",      path: "tools/scene.html",     status: "ready",
+      blurb: "Build a scene command list without hand-writing JSON, with a branch map that shows every jump, choice, dead end and unreachable stretch." },
     { title: "Sprite animation object", path: "tools/sprite-object.html", status: "planned",
       blurb: "Composite sprites and animation objects." }
   ],

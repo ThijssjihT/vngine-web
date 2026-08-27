@@ -3,17 +3,2318 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scene script — VNgine</title>
+<title>Scene script generator — VNgine</title>
 <link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/tool.css">
 <script>window.SITE_BASE = "../";</script>
 </head>
 <body>
-<div class="page">
-  <h1>Scene script</h1>
-    <div class="todo"><strong>TODO</strong> — this page has not been written yet.</div>
+<div class="page wide">
+  <p class="breadcrumb"><a href="index.html">Tools</a> / Scene script</p>
+  <h1>Scene script generator</h1>
+  <p class="lede">Builds one <code>scene_NNNN.json</code> — the command list the engine steps
+  through. Save the result as <code>qml/game/script/&lt;scene id&gt;.json</code>. The map on the
+  right is the scene's branching: every label is a block, every jump and choice is an arrow, and
+  anything unreachable or dead-ended is called out before you build the RPM.</p>
+
+  <div class="tool roomy">
+    <!-- ============================= form ============================= -->
+    <form id="form" autocomplete="off" onsubmit="return false;">
+
+      <fieldset>
+        <legend>Scene</legend>
+        <div class="field">
+          <label for="sceneId">Scene id</label>
+          <input type="text" id="sceneId" value="scene_0001" spellcheck="false">
+        </div>
+        <p class="hint">Saved as <code id="pathHint">script/scene_0001.json</code>. The engine loads
+        a scene by <em>file name</em> and never reads the <code>id</code> field, so the two must
+        match by hand — the id is documentation.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Context — optional, makes the checks sharper</legend>
+        <div class="btn-row">
+          <label class="btn" for="manifestInput">Load game.json…</label>
+          <input type="file" id="manifestInput" accept=".json,application/json" hidden>
+          <label class="btn" for="siblingInput">Load other scenes…</label>
+          <input type="file" id="siblingInput" accept=".json,application/json" multiple hidden>
+          <button type="button" class="btn" id="clearContext">Clear</button>
+        </div>
+        <p class="hint">Nothing is uploaded anywhere — the files are read in your browser. The
+        manifest fills the variable and setting name lists and lets the tool warn about names your
+        game never declares. Other scene files let it check that a <code>jump</code> to another
+        scene actually goes somewhere.</p>
+        <div class="chips" id="contextChips"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Commands</legend>
+        <label class="check" style="margin:.2rem 0 .5rem;">
+          <input type="checkbox" id="compact"> collapse every command except the selected one
+        </label>
+        <div class="cmdlist" id="cmdlist"></div>
+        <p class="hint" id="listHint"></p>
+        <div class="btn-row">
+          <span class="note">Add:</span>
+          <span class="quickadd" id="quickAdd"></span>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Branch templates</legend>
+        <p class="hint">Each one drops in a complete, already-wired pattern with unique label names
+        and a converge point, so nothing is left dangling. Fill in the condition and the lines
+        afterwards. Inserted after the selected command, or at the end.</p>
+        <div class="quickadd" id="templates"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Paste dialogue</legend>
+        <p class="hint">One line per line of dialogue. <code>Liisa: Hello.</code> becomes a
+        <code>say</code> with a speaker; a line with no <code>Name:</code> in front becomes
+        narration. Start a line with <code>-&nbsp;</code> to force narration (needed when the line
+        itself contains a colon), and with <code>//</code> for a comment the tool throws away.</p>
+        <p class="hint">Lines starting with <code>@</code> are commands:
+        <code>@label name</code>, <code>@jump name</code>, <code>@scene scene_0002</code>,
+        <code>@bg bg/room.png</code>, <code>@sprite liisa sprites/liisa_1.png center</code>,
+        <code>@remove liisa</code>, <code>@set panic add 6</code>,
+        <code>@style textbox colorful_textbox</code>, <code>@wait 500</code>, <code>@end</code>.
+        Choices and conditional jumps are not in the shorthand — build those in the form, where the
+        label lists and condition editors are.</p>
+        <textarea id="pasteBox" rows="6" spellcheck="false"
+          placeholder="Liisa: You look like you've seen a ghost.&#10;- You look at the notice board again.&#10;@label calmed_down"></textarea>
+        <div class="paste-preview" id="pastePreview">Nothing to read yet.</div>
+        <div class="btn-row">
+          <button type="button" class="btn primary" id="pasteAppend">Append to end</button>
+          <button type="button" class="btn" id="pasteInsert">Insert after selected</button>
+          <button type="button" class="btn" id="pasteClear">Clear box</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Edit an existing scene</legend>
+        <div class="btn-row">
+          <label class="btn" for="fileInput">Choose file…</label>
+          <input type="file" id="fileInput" accept=".json,application/json" hidden>
+          <button type="button" class="btn" id="resetBtn">Reset everything</button>
+        </div>
+        <div class="dropzone" id="dropZone">…or drop a <code>scene_NNNN.json</code> here</div>
+        <p class="hint">Commands and keys this generator does not model are kept exactly as they
+        were and written back out, so an unfamiliar file survives a round trip.</p>
+      </fieldset>
+    </form>
+
+    <!-- ========================= map + output ========================= -->
+    <div class="tool-side">
+      <div class="map-head">
+        <h2>Branch map</h2>
+        <span class="note" id="mapMeta"></span>
+      </div>
+      <div class="map-wrap" id="mapWrap">
+        <div class="map-canvas" id="mapCanvas">
+          <svg class="map-arcs" id="mapArcs" aria-hidden="true"></svg>
+          <div class="map-blocks" id="mapBlocks"></div>
+        </div>
+      </div>
+      <p class="map-legend">
+        <span><i style="background:#6ec8ff"></i>jump</span>
+        <span><i style="background:#ffb454"></i>jump_if, condition true</span>
+        <span><i style="background:#8fd694"></i>choice option</span>
+        <span>dashed block = never reached</span>
+      </p>
+
+      <div class="notices" id="notices"></div>
+
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="copyBtn">Copy JSON</button>
+        <button type="button" class="btn" id="downloadBtn">Download scene</button>
+      </div>
+      <pre class="json-out" id="output"></pre>
+    </div>
+  </div>
 </div>
+
+<datalist id="dlVar"></datalist>
+<datalist id="dlSetting"></datalist>
+<datalist id="dlAny"></datalist>
+<datalist id="dlLabel"></datalist>
+<datalist id="dlScene"></datalist>
+<datalist id="dlSpeaker"></datalist>
+<datalist id="dlSprite"></datalist>
+<datalist id="dlChannel"></datalist>
+
 <script src="../assets/js/sitemap.js"></script>
 <script src="../assets/js/nav.js"></script>
 <script src="../assets/js/cards.js"></script>
+<script src="../assets/js/engine-defaults.js"></script>
+<script src="../assets/js/tool.js"></script>
+<script>
+(function () {
+
+  var T = window.VNTool;
+
+  /* GameEngine.js interpolate() only matches this shape between percent signs. */
+  var NAME_RE  = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  var INTERP_RE = /%([A-Za-z_][A-Za-z0-9_]*)%/g;
+  var LINE_WIDTH = 104;        /* where the JSON formatter breaks a command over lines */
+
+  /* ------------------------------------------------------------- utilities */
+
+  function elt(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function str(v) { return v === undefined || v === null ? "" : String(v); }
+  function num(v, d) { var n = parseFloat(v); return isNaN(n) ? (d === undefined ? 0 : d) : n; }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function clip(s, n) {
+    s = str(s).replace(/\s+/g, " ").trim();
+    return s.length > n ? s.slice(0, n - 1) + "…" : s;
+  }
+  function takeExtras(src, known) {
+    var out = {};
+    Object.keys(src).forEach(function (k) { if (known.indexOf(k) === -1) out[k] = src[k]; });
+    return out;
+  }
+  function withExtras(o, entry) {
+    if (entry._extra) Object.keys(entry._extra).forEach(function (k) {
+      if (!(k in o)) o[k] = entry._extra[k];
+    });
+    return o;
+  }
+  function vtypeOf(v) {
+    if (typeof v === "boolean") return "bool";
+    if (typeof v === "number")  return "number";
+    return "string";
+  }
+  function castTo(type, v) {
+    if (type === "bool")   return v === true || v === "true" || v === 1;
+    if (type === "number") return num(v, 0);
+    return str(v);
+  }
+
+  /* Only ever look up commands we actually declared — a scene file is allowed to
+     carry a cmd called "constructor", and an inherited property is not a spec. */
+  function specFor(name) {
+    return Object.prototype.hasOwnProperty.call(SPECS, name) ? SPECS[name] : SPECS.__raw;
+  }
+  function bag() { return Object.create(null); }
+
+  /* small labelled form cell */
+  function cell(caption, control, cls) {
+    var c = elt("div", "cf" + (cls ? " " + cls : ""));
+    if (caption !== null) c.appendChild(elt("span", null, caption));
+    c.appendChild(control);
+    return c;
+  }
+  function input(value, oninput, opts) {
+    opts = opts || {};
+    var i = elt("input");
+    i.type = opts.type || "text";
+    i.value = value === undefined || value === null ? "" : value;
+    i.spellcheck = !!opts.spell;
+    if (opts.list)        i.setAttribute("list", opts.list);
+    if (opts.placeholder) i.placeholder = opts.placeholder;
+    if (opts.min !== undefined)  i.min  = opts.min;
+    if (opts.step !== undefined) i.step = opts.step;
+    i.addEventListener("input", function () { oninput(i.value, i); });
+    return i;
+  }
+  function select(options, value, onchange) {
+    var s = elt("select");
+    options.forEach(function (o) {
+      var op = elt("option");
+      op.value = o[0];
+      op.textContent = o[1];
+      s.appendChild(op);
+    });
+    s.value = value;
+    if (s.value !== String(value) && options.length) s.value = options[0][0];
+    s.addEventListener("change", function () { onchange(s.value, s); });
+    return s;
+  }
+  function area(value, oninput, rows) {
+    var t = elt("textarea");
+    t.rows = rows || 2;
+    t.spellcheck = true;
+    t.value = str(value);
+    t.addEventListener("input", function () { oninput(t.value); });
+    return t;
+  }
+  function iconBtn(glyph, title, onclick, cls) {
+    var b = elt("button", cls || "", glyph);
+    b.type = "button";
+    b.title = title;
+    b.addEventListener("click", onclick);
+    return b;
+  }
+
+  /* ------------------------------------------------------------------ state */
+
+  var sceneId = "scene_0001";
+  var cmds    = [];
+  var extras  = {};          /* top-level scene keys we do not model */
+  var manifest = null;       /* { name, vars:{}, settings:{}, entry } */
+  var siblings = Object.create(null);   /* sceneId -> { labels: [], file: "" } */
+  var selected = -1;
+  var compact  = false;
+
+  /* --------------------------------------------------------- command specs */
+  /*
+     impl:false marks a command the engine does not run yet. GameScreen.qml's
+     default branch logs it and skips to the next command, so it is safe to
+     write today — it simply does nothing until the case lands.
+  */
+
+  var SPECS = {
+
+    say: {
+      title: "say", group: "story", impl: true,
+      make: function () { return { cmd: "say", speaker: "", text: "", text_key: "", _mode: "text" }; },
+      from: function (c) {
+        return {
+          cmd: "say",
+          speaker: c.speaker === null || c.speaker === undefined ? "" : String(c.speaker),
+          text: str(c.text),
+          text_key: str(c.text_key),
+          _mode: c.text_key ? "key" : "text",
+          _extra: takeExtras(c, ["cmd", "speaker", "text", "text_key"])
+        };
+      },
+      to: function (e) {
+        var o = { cmd: "say", speaker: e.speaker.trim() ? e.speaker : null };
+        if (e._mode === "key") o.text_key = e.text_key; else o.text = e.text;
+        return withExtras(o, e);
+      },
+      summary: function (e) {
+        var who = e.speaker.trim() ? e.speaker : "narration";
+        return who + " — " + clip(e._mode === "key" ? "[" + e.text_key + "]" : e.text, 70);
+      },
+      body: function (e, box) {
+        box.className = "cmd-body say";
+        box.appendChild(cell("speaker", input(e.speaker, function (v) { e.speaker = v; touch(); },
+          { list: "dlSpeaker", placeholder: "blank = narration", spell: false })));
+        box.appendChild(cell("as", select([["text", "text"], ["key", "text_key"]], e._mode,
+          function (v) { e._mode = v; redraw(); })));
+        if (e._mode === "key") {
+          box.appendChild(cell("text_key", input(e.text_key, function (v) { e.text_key = v; touch(); },
+            { spell: false, placeholder: "s0001_01" })));
+        } else {
+          box.appendChild(cell("text", area(e.text, function (v) { e.text = v; touch(); }, 2)));
+        }
+        if (e._mode === "key") note(box, "The lookup is a stub in the current engine — it renders " +
+          "the key in square brackets. Inline text is what plays today.");
+      }
+    },
+
+    bg: {
+      title: "bg", group: "stage", impl: true,
+      make: function () { return { cmd: "bg", image: "", transition: "" }; },
+      from: function (c) {
+        return { cmd: "bg", image: str(c.image), transition: str(c.transition),
+                 _extra: takeExtras(c, ["cmd", "image", "transition"]) };
+      },
+      to: function (e) {
+        var o = { cmd: "bg", image: e.image };
+        if (e.transition) o.transition = e.transition;
+        return withExtras(o, e);
+      },
+      summary: function (e) { return e.image || "(no image)"; },
+      body: function (e, box) {
+        box.className = "cmd-body two";
+        box.appendChild(cell("image, relative to assets/", input(e.image,
+          function (v) { e.image = v; touch(); }, { spell: false, placeholder: "bg/forest_day.png" })));
+        box.appendChild(cell("transition", select(
+          [["", "cut (default)"], ["fade", "fade"], ["slide", "slide"], ["cut", "cut"]],
+          e.transition, function (v) { e.transition = v; touch(); })));
+        if (e.transition) note(box, "Transitions are not implemented — the engine swaps the " +
+          "background instantly and ignores this key.", true);
+      }
+    },
+
+    sprite: {
+      title: "sprite", group: "stage", impl: true,
+      make: function () { return { cmd: "sprite", id: "", image: "", position: "center" }; },
+      from: function (c) {
+        return { cmd: "sprite", id: str(c.id), image: str(c.image), position: str(c.position),
+                 _extra: takeExtras(c, ["cmd", "id", "image", "position"]) };
+      },
+      to: function (e) {
+        return withExtras({ cmd: "sprite", id: e.id, image: e.image, position: e.position }, e);
+      },
+      summary: function (e) { return (e.id || "?") + " → " + (e.image || "?") + " @ " + (e.position || "center"); },
+      body: function (e, box) {
+        box.className = "cmd-body three";
+        box.appendChild(cell("id", input(e.id, function (v) { e.id = v; touch(); },
+          { spell: false, placeholder: "liisa" })));
+        box.appendChild(cell("image", input(e.image, function (v) { e.image = v; touch(); },
+          { spell: false, placeholder: "sprites/liisa_1.png" })));
+        box.appendChild(cell("position", input(e.position, function (v) { e.position = v; touch(); },
+          { spell: false, placeholder: "left | center | right | 60%,0" })));
+        note(box, "Re-using an id replaces that sprite instead of adding a second one. " +
+          "A pair like <code>60%,0</code> places the sprite's horizontal centre by hand.");
+      }
+    },
+
+    sprite_remove: {
+      title: "sprite_remove", group: "stage", impl: true,
+      make: function () { return { cmd: "sprite_remove", id: "" }; },
+      from: function (c) {
+        return { cmd: "sprite_remove", id: str(c.id),
+                 _extra: takeExtras(c, ["cmd", "id"]) };
+      },
+      to: function (e) { return withExtras({ cmd: "sprite_remove", id: e.id }, e); },
+      summary: function (e) { return e.id || "(no id)"; },
+      body: function (e, box) {
+        box.className = "cmd-body one";
+        box.appendChild(cell("id", input(e.id, function (v) { e.id = v; touch(); },
+          { spell: false, list: "dlSprite" })));
+      }
+    },
+
+    set: {
+      title: "set", group: "logic", impl: true,
+      make: function () {
+        return { cmd: "set", "var": "", op: "set", _src: "value", value: 0, _vtype: "number", from: { "var": "", setting: "" } };
+      },
+      from: function (c) {
+        var e = { cmd: "set", "var": str(c["var"]), op: str(c.op) || "set",
+                  _src: "value", value: c.value, _vtype: vtypeOf(c.value),
+                  from: { "var": "", setting: "" },
+                  _extra: takeExtras(c, ["cmd", "var", "op", "value", "from", "from_setting"]) };
+        if (T.isPlainObject(c.from)) {
+          if (c.from["var"] !== undefined)     { e._src = "var";     e.from["var"] = str(c.from["var"]); }
+          else if (c.from.setting !== undefined) { e._src = "setting"; e.from.setting = str(c.from.setting); }
+        } else if (c.from_setting !== undefined) {
+          /* the shape the design document uses; the engine reads `from`. */
+          e._src = "setting"; e.from.setting = str(c.from_setting); e._converted = true;
+        }
+        if (e.value === undefined) { e.value = 0; e._vtype = "number"; }
+        return e;
+      },
+      to: function (e) {
+        var o = { cmd: "set", "var": e["var"], op: e.op };
+        if (e._src === "value") o.value = e.value;
+        else { var f = {}; f[e._src] = e.from[e._src]; o.from = f; }
+        return withExtras(o, e);
+      },
+      summary: function (e) {
+        var rhs = e._src === "value" ? JSON.stringify(e.value) : e._src + " " + e.from[e._src];
+        return (e["var"] || "?") + " " + e.op + " " + rhs;
+      },
+      body: function (e, box) {
+        box.className = "cmd-body auto";
+        box.appendChild(cell("variable", input(e["var"], function (v) { e["var"] = v; touch(); },
+          { spell: false, list: "dlVar" })));
+        box.appendChild(cell("op", select([["set", "set"], ["add", "add"], ["sub", "sub"], ["mul", "mul"]],
+          e.op, function (v) { e.op = v; touch(); })));
+        box.appendChild(cell("value from", select(
+          [["value", "a literal"], ["var", "another variable"], ["setting", "a setting"]],
+          e._src, function (v) { e._src = v; redraw(); })));
+        if (e._src === "value") {
+          box.appendChild(typedValue(e, "value", "_vtype"));
+        } else {
+          box.appendChild(cell(e._src === "var" ? "source variable" : "source setting",
+            input(e.from[e._src], function (v) { e.from[e._src] = v; touch(); },
+              { spell: false, list: e._src === "var" ? "dlVar" : "dlSetting" })));
+        }
+        if (e.op === "mul") note(box, "A variable that was never given a value counts as 0 here, " +
+          "so multiplying an unset variable gives 0, not the value you multiplied by.");
+        if (e._converted) note(box, "Loaded as <code>from_setting</code> and rewritten as " +
+          "<code>\"from\": { \"setting\": … }</code>, which is the shape the engine actually reads.", true);
+      }
+    },
+
+    label: {
+      title: "label", group: "flow", impl: true,
+      make: function () { return { cmd: "label", label: "" }; },
+      from: function (c) {
+        return { cmd: "label", label: str(c.label), _extra: takeExtras(c, ["cmd", "label"]) };
+      },
+      to: function (e) { return withExtras({ cmd: "label", label: e.label }, e); },
+      summary: function (e) { return e.label || "(unnamed)"; },
+      body: function (e, box) {
+        box.className = "cmd-body one";
+        box.appendChild(cell("name", input(e.label, function (v) { e.label = v; touch(); },
+          { spell: false, placeholder: "dont_panic" })));
+        note(box, "Labels are indexed per scene, so only a jump inside this same file can reach it.");
+      }
+    },
+
+    jump: {
+      title: "jump", group: "flow", impl: true,
+      make: function () { return { cmd: "jump", _t: { kind: "label", name: "" } }; },
+      from: function (c) { return { cmd: "jump", _t: targetFrom(c), _extra: extrasForTarget(c, ["cmd"]) }; },
+      to: function (e) { return withExtras(targetTo({ cmd: "jump" }, e._t), e); },
+      summary: function (e) { return targetText(e._t); },
+      body: function (e, box) { targetBody(e, box); }
+    },
+
+    jump_if: {
+      title: "jump_if", group: "flow", impl: true,
+      make: function () {
+        return { cmd: "jump_if", condition: newCondition(), _t: { kind: "label", name: "" } };
+      },
+      from: function (c) {
+        return { cmd: "jump_if", condition: condFrom(c.condition), _t: targetFrom(c),
+                 _extra: extrasForTarget(c, ["cmd", "condition"]) };
+      },
+      to: function (e) {
+        var o = { cmd: "jump_if" };
+        var c = condTo(e.condition);
+        if (c) o.condition = c;
+        return withExtras(targetTo(o, e._t), e);
+      },
+      summary: function (e) { return condText(e.condition) + " → " + targetText(e._t); },
+      body: function (e, box) {
+        box.className = "cmd-body one";
+        box.appendChild(conditionEditor(e, "condition", "condition"));
+        var t = elt("div"); targetBody(e, t); t.style.marginTop = ".35rem";
+        box.appendChild(t);
+        note(box, "When the condition is false the scene simply carries on with the next command.");
+      }
+    },
+
+    choice: {
+      title: "choice", group: "flow", impl: true,
+      make: function () {
+        return { cmd: "choice", options: [newOption(), newOption()] };
+      },
+      from: function (c) {
+        return {
+          cmd: "choice",
+          options: (Array.isArray(c.options) ? c.options : []).map(optionFrom),
+          _extra: takeExtras(c, ["cmd", "options"])
+        };
+      },
+      to: function (e) {
+        return withExtras({ cmd: "choice", options: e.options.map(optionTo) }, e);
+      },
+      summary: function (e) {
+        return e.options.length + (e.options.length === 1 ? " option" : " options") + ": " +
+          clip(e.options.map(function (o) { return o._mode === "key" ? "[" + o.text_key + "]" : o.text; })
+               .join(" / "), 60);
+      },
+      body: function (e, box) {
+        box.className = "cmd-body one";
+        var wrap = elt("div", "opts");
+        e.options.forEach(function (o, i) { wrap.appendChild(optionRow(e, o, i)); });
+        box.appendChild(wrap);
+        var row = elt("div", "btn-row");
+        var add = elt("button", "btn", "Add option");
+        add.type = "button";
+        add.addEventListener("click", function () { e.options.push(newOption()); redraw(); });
+        row.appendChild(add);
+        box.appendChild(row);
+        note(box, "An option whose condition is false is hidden. If every option ends up hidden " +
+          "the engine warns and skips the whole choice, so keep at least one unconditional.");
+      }
+    },
+
+    style: {
+      title: "style", group: "stage", impl: true,
+      make: function () { return { cmd: "style", category: "textbox", style: "" }; },
+      from: function (c) {
+        return { cmd: "style", category: str(c.category) || "textbox", style: str(c.style),
+                 _extra: takeExtras(c, ["cmd", "category", "style"]) };
+      },
+      to: function (e) {
+        return withExtras({ cmd: "style", category: e.category, style: e.style }, e);
+      },
+      summary: function (e) { return e.category + " → " + (e.style || "(none)"); },
+      body: function (e, box) {
+        box.className = "cmd-body two";
+        box.appendChild(cell("category", select(
+          [["textbox", "textbox"], ["choice", "choice"], ["hud", "hud"]],
+          e.category, function (v) { e.category = v; redraw(); })));
+        box.appendChild(cell("style id", input(e.style, function (v) { e.style = v; touch(); },
+          { spell: false, placeholder: "colorful_textbox" })));
+        note(box, "Resolved from <code>assets/ui/" + esc(e.category) + "/&lt;id&gt;.json</code> " +
+          "against the engine default — it replaces the active style rather than layering onto it.");
+        if (e.category === "textbox") note(box, "Current engine build: the textbox branch in " +
+          "<code>GameScreen.qml</code> tests <code>category === \"text\"</code>, so " +
+          "<code>\"textbox\"</code> falls through to the unknown-category warning and nothing " +
+          "changes on screen. The category name here follows the design document; the engine " +
+          "needs the fix.", true);
+      }
+    },
+
+    audio_bg: {
+      title: "audio_bg", group: "audio", impl: false,
+      make: function () { return { cmd: "audio_bg", file: "", _stop: false }; },
+      from: function (c) {
+        return { cmd: "audio_bg", file: c.file === null ? "" : str(c.file), _stop: c.file === null,
+                 _extra: takeExtras(c, ["cmd", "file"]) };
+      },
+      to: function (e) {
+        return withExtras({ cmd: "audio_bg", file: e._stop ? null : e.file }, e);
+      },
+      summary: function (e) { return e._stop ? "stop music" : (e.file || "(no file)"); },
+      body: function (e, box) {
+        box.className = "cmd-body two";
+        box.appendChild(cell("file", input(e.file, function (v) { e.file = v; touch(); },
+          { spell: false, placeholder: "audio/music/theme.mp3" })));
+        var c = elt("label", "check");
+        var cb = elt("input"); cb.type = "checkbox"; cb.checked = e._stop;
+        cb.addEventListener("change", function () { e._stop = cb.checked; redraw(); });
+        c.appendChild(cb); c.appendChild(document.createTextNode(" stop the music (writes null)"));
+        box.appendChild(cell("or", c));
+      }
+    },
+
+    audio_sfx: {
+      title: "audio_sfx", group: "audio", impl: false,
+      make: function () { return { cmd: "audio_sfx", file: "", channel: "game_fx" }; },
+      from: function (c) {
+        return { cmd: "audio_sfx", file: str(c.file), channel: str(c.channel) || "game_fx",
+                 _extra: takeExtras(c, ["cmd", "file", "channel"]) };
+      },
+      to: function (e) {
+        return withExtras({ cmd: "audio_sfx", file: e.file, channel: e.channel }, e);
+      },
+      summary: function (e) { return (e.file || "(no file)") + " on " + e.channel; },
+      body: function (e, box) {
+        box.className = "cmd-body two";
+        box.appendChild(cell("file", input(e.file, function (v) { e.file = v; touch(); },
+          { spell: false, placeholder: "audio/sfx/boink.ogg" })));
+        box.appendChild(cell("channel", input(e.channel, function (v) { e.channel = v; touch(); },
+          { spell: false, list: "dlChannel" })));
+      }
+    },
+
+    audio_voice: {
+      title: "audio_voice", group: "audio", impl: false,
+      make: function () { return { cmd: "audio_voice", file: "" }; },
+      from: function (c) {
+        return { cmd: "audio_voice", file: str(c.file), _extra: takeExtras(c, ["cmd", "file"]) };
+      },
+      to: function (e) { return withExtras({ cmd: "audio_voice", file: e.file }, e); },
+      summary: function (e) { return e.file || "(no file)"; },
+      body: function (e, box) {
+        box.className = "cmd-body one";
+        box.appendChild(cell("file", input(e.file, function (v) { e.file = v; touch(); },
+          { spell: false, placeholder: "audio/voice/liisa_0001.ogg" })));
+      }
+    },
+
+    show_hud: {
+      title: "show_hud", group: "stage", impl: false,
+      make: function () { return { cmd: "show_hud", "var": "", visible: true }; },
+      from: function (c) {
+        return { cmd: "show_hud", "var": str(c["var"]), visible: c.visible !== false,
+                 _extra: takeExtras(c, ["cmd", "var", "visible"]) };
+      },
+      to: function (e) {
+        return withExtras({ cmd: "show_hud", "var": e["var"], visible: !!e.visible }, e);
+      },
+      summary: function (e) { return (e["var"] || "?") + (e.visible ? " — shown" : " — hidden"); },
+      body: function (e, box) {
+        box.className = "cmd-body two";
+        box.appendChild(cell("variable", input(e["var"], function (v) { e["var"] = v; touch(); },
+          { spell: false, list: "dlAny" })));
+        box.appendChild(cell("visible", select([["true", "show"], ["false", "hide"]],
+          String(!!e.visible), function (v) { e.visible = v === "true"; touch(); })));
+      }
+    },
+
+    wait: {
+      title: "wait", group: "flow", impl: false,
+      make: function () { return { cmd: "wait", ms: 500 }; },
+      from: function (c) {
+        return { cmd: "wait", ms: num(c.ms, 500), _extra: takeExtras(c, ["cmd", "ms"]) };
+      },
+      to: function (e) { return withExtras({ cmd: "wait", ms: e.ms }, e); },
+      summary: function (e) { return e.ms + " ms"; },
+      body: function (e, box) {
+        box.className = "cmd-body one";
+        box.appendChild(cell("milliseconds", input(e.ms, function (v) { e.ms = num(v, 0); touch(); },
+          { type: "number", min: 0, step: 50 })));
+      }
+    },
+
+    end: {
+      title: "end", group: "flow", impl: false,
+      make: function () { return { cmd: "end" }; },
+      from: function (c) { return { cmd: "end", _extra: takeExtras(c, ["cmd"]) }; },
+      to: function (e) { return withExtras({ cmd: "end" }, e); },
+      summary: function () { return "end of route"; },
+      body: function (e, box) {
+        box.className = "cmd-body one";
+        note(box, "Not implemented. Today the engine logs an unknown command and steps past it, " +
+          "so put it last and the scene ends anyway — by running off the end, with two warnings " +
+          "in the log rather than a clean stop.", true);
+      }
+    },
+
+    __raw: {
+      title: "(unknown command)", group: "raw", impl: true, hidden: true,
+      make: function () { return { cmd: "__raw", _text: "{ \"cmd\": \"\" }" }; },
+      from: function (c) { return { cmd: "__raw", _text: T.pretty(c) }; },
+      to: function (e) {
+        try { return JSON.parse(e._text); } catch (x) { return { cmd: "__unparsed" }; }
+      },
+      summary: function (e) {
+        var c = null;
+        try { c = JSON.parse(e._text); } catch (x) { return "not valid JSON"; }
+        return "cmd: " + str(c && c.cmd);
+      },
+      body: function (e, box) {
+        box.className = "cmd-body one";
+        box.appendChild(cell("raw JSON", area(e._text, function (v) { e._text = v; touch(); }, 4)));
+        note(box, "This generator has no editor for this command, so it is kept as written and " +
+          "copied straight into the output.");
+      }
+    }
+  };
+
+  var CMD_ORDER = ["say", "bg", "sprite", "sprite_remove", "set", "label", "jump", "jump_if",
+                   "choice", "style", "show_hud", "audio_bg", "audio_sfx", "audio_voice",
+                   "wait", "end"];
+
+  /* Commands that stop the run loop and wait for the player. */
+  function halts(c) { return c.cmd === "say" || c.cmd === "choice"; }
+  /* Commands that end a straight-line block. */
+  function branches(c) {
+    return c.cmd === "jump" || c.cmd === "jump_if" || c.cmd === "choice" || c.cmd === "end";
+  }
+
+  function note(box, html, warn) {
+    var p = elt("p", "cmd-note" + (warn ? " warn" : ""));
+    p.innerHTML = html;
+    box.appendChild(p);
+  }
+
+  /* -------------------------------------------------------- shared editors */
+
+  /* Two cells — a type picker and the value itself — so each gets its own
+     column wherever this is dropped, rather than sharing one narrow track. */
+  function typedValue(holder, valueKey, typeKey) {
+    var frag = document.createDocumentFragment();
+    frag.appendChild(cell("type", select(
+      [["string", "text"], ["number", "number"], ["bool", "true/false"]], holder[typeKey],
+      function (v) {
+        holder[typeKey] = v;
+        holder[valueKey] = castTo(v, holder[valueKey]);
+        redraw();
+      })));
+    var control;
+    if (holder[typeKey] === "bool") {
+      control = select([["true", "true"], ["false", "false"]], String(!!holder[valueKey]),
+        function (v) { holder[valueKey] = v === "true"; touch(); });
+    } else if (holder[typeKey] === "number") {
+      control = input(holder[valueKey], function (v) { holder[valueKey] = num(v, 0); touch(); },
+        { type: "number", step: "any" });
+    } else {
+      control = input(holder[valueKey], function (v) { holder[valueKey] = v; touch(); }, { spell: false });
+    }
+    frag.appendChild(cell("value", control));
+    return frag;
+  }
+
+  /* --- jump target ------------------------------------------------------- */
+
+  function targetFrom(c) {
+    if (c.label !== undefined && c.label !== null && c.label !== "")
+      return { kind: "label", name: String(c.label) };
+    if (c.scene !== undefined && c.scene !== null && c.scene !== "")
+      return { kind: "scene", name: String(c.scene) };
+    return { kind: "none", name: "" };
+  }
+  /* If a command carries both keys the engine uses `label`; keep `scene` so the
+     file round-trips and let the notices explain which one wins. */
+  function extrasForTarget(c, known) {
+    var k = known.concat(["label", "scene"]);
+    var out = takeExtras(c, k);
+    if (c.label && c.scene) out.scene = c.scene;
+    return out;
+  }
+  function targetTo(o, t) {
+    if (t.kind === "label" && t.name) o.label = t.name;
+    else if (t.kind === "scene" && t.name) o.scene = t.name;
+    return o;
+  }
+  function targetText(t) {
+    if (t.kind === "none") return "falls through";
+    return (t.kind === "scene" ? "scene " : "") + (t.name || "(nothing)");
+  }
+  function targetBody(e, box) {
+    box.className = "cmd-body target";
+    box.appendChild(cell("go to", select(
+      [["label", "a label in this scene"], ["scene", "another scene"], ["none", "nothing, fall through"]],
+      e._t.kind, function (v) { e._t.kind = v; redraw(); })));
+    if (e._t.kind !== "none") {
+      box.appendChild(cell(e._t.kind === "label" ? "label" : "scene id",
+        input(e._t.name, function (v) { e._t.name = v; touch(); },
+          { spell: false, list: e._t.kind === "label" ? "dlLabel" : "dlScene" })));
+    } else {
+      note(box, "Writing neither key is allowed — the engine logs a note and carries on with the " +
+        "next command. Useful on a choice option that just falls back into the main line.");
+    }
+  }
+
+  /* --- condition --------------------------------------------------------- */
+
+  function newCondition() {
+    return { _src: "var", name: "", op: "", value: "", _vtype: "string" };
+  }
+  function condFrom(c) {
+    if (!T.isPlainObject(c)) return null;
+    var src = c["var"] !== undefined ? "var"
+            : c.setting !== undefined ? "setting"
+            : c.flag !== undefined ? "flag" : "var";
+    return {
+      _src: src,
+      name: str(c[src]),
+      op: c.op === undefined || c.op === null ? "" : String(c.op),
+      value: c.value === undefined ? "" : c.value,
+      _vtype: vtypeOf(c.value === undefined ? "" : c.value),
+      _extra: takeExtras(c, ["var", "setting", "flag", "op", "value"])
+    };
+  }
+  function condTo(c) {
+    if (!c || !c.name.trim()) return null;
+    var o = {};
+    o[c._src] = c.name;
+    if (c.op) { o.op = c.op; o.value = c.value; }
+    return withExtras(o, c);
+  }
+  function condText(c) {
+    if (!c || !c.name.trim()) return "always";
+    return c._src + " " + c.name + (c.op ? " " + c.op + " " + JSON.stringify(c.value) : " is true");
+  }
+  var OPS = [["", "is true"], ["==", "=="], ["!=", "!="], ["<", "<"], ["<=", "<="], [">", ">"], [">=", ">="]];
+
+  function conditionEditor(holder, key, caption) {
+    var wrap = elt("div", "cf");
+    wrap.appendChild(elt("span", null, caption));
+    var c = holder[key];
+    var grid = elt("div", "cond" + (c && c.op ? "" : " no-value"));
+
+    grid.appendChild(cell("looks at", select(
+      [["none", "— always —"], ["var", "variable"], ["setting", "setting"], ["flag", "flag"]],
+      c ? c._src : "none",
+      function (v) {
+        if (v === "none") holder[key] = null;
+        else { if (!holder[key]) holder[key] = newCondition(); holder[key]._src = v; }
+        redraw();
+      })));
+
+    if (c) {
+      grid.appendChild(cell("name", input(c.name, function (v) { c.name = v; touch(); },
+        { spell: false, list: c._src === "setting" ? "dlSetting" : c._src === "var" ? "dlVar" : "dlAny" })));
+      grid.appendChild(cell("test", select(OPS, c.op, function (v) { c.op = v; redraw(); })));
+      if (c.op) {
+        var t = select([["string", "text"], ["number", "number"], ["bool", "true/false"]], c._vtype,
+          function (v) { c._vtype = v; c.value = castTo(v, c.value); redraw(); });
+        grid.appendChild(cell("type", t));
+        if (c._vtype === "bool") {
+          grid.appendChild(cell("value", select([["true", "true"], ["false", "false"]],
+            String(!!c.value), function (v) { c.value = v === "true"; touch(); })));
+        } else if (c._vtype === "number") {
+          grid.appendChild(cell("value", input(c.value, function (v) { c.value = num(v, 0); touch(); },
+            { type: "number", step: "any" })));
+        } else {
+          grid.appendChild(cell("value", input(c.value, function (v) { c.value = v; touch(); },
+            { spell: false })));
+        }
+      }
+    }
+    wrap.appendChild(grid);
+    if (c && c._src === "flag")
+      note(wrap, "A flag reads the variable of that name and falls back to a setting of the same " +
+        "name if there is no such variable.");
+    if (c && !c.op)
+      note(wrap, "With no test the value is checked for truth: <code>0</code>, an empty string and " +
+        "<code>false</code> are false, anything else is true.");
+    if (c && c.op)
+      note(wrap, "Comparison is strict — <code>3</code> and <code>\"3\"</code> are never equal, so " +
+        "the type here has to match what the variable actually holds.");
+    return wrap;
+  }
+
+  /* --- effects ----------------------------------------------------------- */
+
+  function newEffect() {
+    return { "var": "", op: "add", _src: "value", value: 1, _vtype: "number",
+             from: { "var": "", setting: "" } };
+  }
+  function effectFrom(x) {
+    if (!T.isPlainObject(x)) return newEffect();
+    var e = { "var": str(x["var"]), op: str(x.op) || "set", _src: "value",
+              value: x.value === undefined ? 0 : x.value,
+              _vtype: vtypeOf(x.value === undefined ? 0 : x.value),
+              from: { "var": "", setting: "" },
+              _extra: takeExtras(x, ["var", "op", "value", "from"]) };
+    if (T.isPlainObject(x.from)) {
+      if (x.from["var"] !== undefined)       { e._src = "var";     e.from["var"] = str(x.from["var"]); }
+      else if (x.from.setting !== undefined) { e._src = "setting"; e.from.setting = str(x.from.setting); }
+    }
+    return e;
+  }
+  function effectTo(e) {
+    var o = { "var": e["var"], op: e.op };
+    if (e._src === "value") o.value = e.value;
+    else { var f = {}; f[e._src] = e.from[e._src]; o.from = f; }
+    return withExtras(o, e);
+  }
+  function effectsEditor(holder) {
+    var wrap = elt("div", "cf");
+    wrap.appendChild(elt("span", null, "effects when picked"));
+    var list = elt("div", "effects");
+    holder.effects.forEach(function (fx, i) {
+      var outer = elt("div", "effect");
+      var row = elt("div", "effect-fields");
+      row.appendChild(cell("variable", input(fx["var"], function (v) { fx["var"] = v; touch(); },
+        { spell: false, list: "dlVar" })));
+      row.appendChild(cell("op", select([["set", "set"], ["add", "add"], ["sub", "sub"], ["mul", "mul"]],
+        fx.op, function (v) { fx.op = v; touch(); })));
+      row.appendChild(cell("from", select(
+        [["value", "a literal"], ["var", "a variable"], ["setting", "a setting"]],
+        fx._src, function (v) { fx._src = v; redraw(); })));
+      if (fx._src === "value") {
+        row.appendChild(typedValue(fx, "value", "_vtype"));
+      } else {
+        row.appendChild(cell("source", input(fx.from[fx._src], function (v) { fx.from[fx._src] = v; touch(); },
+          { spell: false, list: fx._src === "var" ? "dlVar" : "dlSetting" })));
+      }
+      var tools = elt("div", "cmd-tools");
+      tools.appendChild(iconBtn("×", "Remove effect", function () {
+        holder.effects.splice(i, 1); redraw();
+      }, "danger"));
+      outer.appendChild(row);
+      outer.appendChild(tools);
+      list.appendChild(outer);
+    });
+    if (!holder.effects.length) {
+      var none = elt("p", "cmd-note", "No effects.");
+      list.appendChild(none);
+    }
+    wrap.appendChild(list);
+    var row2 = elt("div", "btn-row");
+    var add = elt("button", "btn", "Add effect");
+    add.type = "button";
+    add.addEventListener("click", function () { holder.effects.push(newEffect()); redraw(); });
+    row2.appendChild(add);
+    wrap.appendChild(row2);
+    return wrap;
+  }
+
+  /* --- choice options ---------------------------------------------------- */
+
+  function newOption() {
+    return { text: "", text_key: "", _mode: "text", condition: null, effects: [],
+             _t: { kind: "none", name: "" } };
+  }
+  function optionFrom(o) {
+    if (!T.isPlainObject(o)) return newOption();
+    return {
+      text: str(o.text),
+      text_key: str(o.text_key),
+      _mode: o.text_key ? "key" : "text",
+      condition: condFrom(o.condition),
+      effects: (Array.isArray(o.effects) ? o.effects : []).map(effectFrom),
+      _t: targetFrom(o),
+      _extra: extrasForTarget(o, ["text", "text_key", "condition", "effects"])
+    };
+  }
+  function optionTo(o) {
+    var out = {};
+    if (o._mode === "key") out.text_key = o.text_key; else out.text = o.text;
+    out.condition = condTo(o.condition);          /* null is the documented "always" */
+    if (o.effects.length) out.effects = o.effects.map(effectTo);
+    targetTo(out, o._t);
+    return withExtras(out, o);
+  }
+  function optionRow(choiceEntry, o, index) {
+    var box = elt("div", "opt");
+
+    var head = elt("div", "opt-head");
+    head.appendChild(elt("span", "tag", "option " + (index + 1)));
+    var tools = elt("div", "cmd-tools");
+    tools.appendChild(iconBtn("↑", "Move up", function () {
+      if (index === 0) return;
+      var a = choiceEntry.options;
+      a.splice(index - 1, 0, a.splice(index, 1)[0]); redraw();
+    }));
+    tools.appendChild(iconBtn("↓", "Move down", function () {
+      var a = choiceEntry.options;
+      if (index >= a.length - 1) return;
+      a.splice(index + 1, 0, a.splice(index, 1)[0]); redraw();
+    }));
+    tools.appendChild(iconBtn("×", "Remove option", function () {
+      choiceEntry.options.splice(index, 1); redraw();
+    }, "danger"));
+    head.appendChild(tools);
+    box.appendChild(head);
+
+    var textRow = elt("div", "cmd-body say");
+    textRow.style.margin = "0";
+    textRow.appendChild(cell("as", select([["text", "text"], ["key", "text_key"]], o._mode,
+      function (v) { o._mode = v; redraw(); })));
+    if (o._mode === "key") {
+      textRow.appendChild(cell("text_key", input(o.text_key, function (v) { o.text_key = v; touch(); },
+        { spell: false })));
+    } else {
+      textRow.appendChild(cell("label shown to the player",
+        input(o.text, function (v) { o.text = v; touch(); }, { placeholder: "Don't panic" })));
+    }
+    textRow.style.gridTemplateColumns = "4.4rem minmax(0,1fr)";
+    box.appendChild(textRow);
+
+    box.appendChild(conditionEditor(o, "condition", "shown only when"));
+    box.appendChild(effectsEditor(o));
+
+    var t = elt("div");
+    targetBody(o, t);
+    t.style.margin = "0";
+    box.appendChild(t);
+    return box;
+  }
+
+  /* --------------------------------------------------------------- the DOM */
+
+  var listBox    = document.getElementById("cmdlist");
+  var listHint   = document.getElementById("listHint");
+  var output     = document.getElementById("output");
+  var noticeBox  = document.getElementById("notices");
+  var mapBlocks  = document.getElementById("mapBlocks");
+  var mapArcs    = document.getElementById("mapArcs");
+  var mapCanvas  = document.getElementById("mapCanvas");
+  var mapMeta    = document.getElementById("mapMeta");
+  var sceneIdEl  = document.getElementById("sceneId");
+  var pathHint   = document.getElementById("pathHint");
+  var chipBox    = document.getElementById("contextChips");
+  var rowEls     = [];
+
+  /* ------------------------------------------------------------ list edits */
+
+  function addCommand(kind, at) {
+    var entry = SPECS[kind].make();
+    var index = (at === undefined || at < 0 || at > cmds.length) ? cmds.length : at;
+    cmds.splice(index, 0, entry);
+    selected = index;
+    redraw(index);
+    return index;
+  }
+
+  function renderCommands() {
+    listBox.innerHTML = "";
+    rowEls = [];
+
+    if (!cmds.length) {
+      listBox.appendChild(elt("p", "list-empty",
+        "No commands yet. Add one below, paste some dialogue, or drop an existing scene file in."));
+      return;
+    }
+
+    cmds.forEach(function (entry, i) {
+      var spec = specFor(entry.cmd);
+      var row  = elt("div", "cmd" + (spec.impl ? "" : " planned") + (i === selected ? " sel" : ""));
+      row.id = "cmd-" + i;
+
+      var head = elt("div", "cmd-head");
+      head.appendChild(elt("span", "cmd-n", "#" + i));
+
+      var typeSel = elt("select", "cmd-type");
+      CMD_ORDER.forEach(function (k) {
+        var op = elt("option");
+        op.value = k;
+        op.textContent = SPECS[k].title + (SPECS[k].impl ? "" : " ·");
+        typeSel.appendChild(op);
+      });
+      if (entry.cmd === "__raw") {
+        var op = elt("option");
+        op.value = "__raw";
+        op.textContent = "(unknown)";
+        typeSel.appendChild(op);
+      }
+      typeSel.value = entry.cmd;
+      typeSel.addEventListener("change", function () {
+        cmds[i] = SPECS[typeSel.value].make();
+        selected = i;
+        redraw(i);
+      });
+      head.appendChild(typeSel);
+
+      var sum = elt("span", "cmd-sum");
+      sum.innerHTML = "<b>" + esc(spec.summary(entry)) + "</b>";
+      head.appendChild(sum);
+
+      var tools = elt("div", "cmd-tools");
+      tools.appendChild(iconBtn("↑", "Move up", function () {
+        if (i === 0) return;
+        cmds.splice(i - 1, 0, cmds.splice(i, 1)[0]);
+        selected = i - 1;
+        redraw(i - 1);
+      }));
+      tools.appendChild(iconBtn("↓", "Move down", function () {
+        if (i >= cmds.length - 1) return;
+        cmds.splice(i + 1, 0, cmds.splice(i, 1)[0]);
+        selected = i + 1;
+        redraw(i + 1);
+      }));
+      tools.appendChild(iconBtn("⧉", "Duplicate", function () {
+        cmds.splice(i + 1, 0, JSON.parse(JSON.stringify(cmds[i])));
+        selected = i + 1;
+        redraw(i + 1);
+      }));
+      tools.appendChild(iconBtn("+", "Insert a say below", function () {
+        addCommand("say", i + 1);
+      }));
+      tools.appendChild(iconBtn("×", "Delete", function () {
+        cmds.splice(i, 1);
+        if (selected >= cmds.length) selected = cmds.length - 1;
+        redraw();
+      }, "danger"));
+      head.appendChild(tools);
+      row.appendChild(head);
+
+      var body = elt("div", "cmd-body");
+      spec.body(entry, body);
+      row.appendChild(body);
+
+      row.addEventListener("focusin", function () {
+        if (selected === i) return;
+        selected = i;
+        markSelection();
+      });
+      row.addEventListener("click", function (ev) {
+        if (ev.target === row || ev.target === head || ev.target === sum) {
+          selected = i;
+          markSelection();
+        }
+      });
+
+      listBox.appendChild(row);
+      rowEls.push(row);
+    });
+    markSelection();
+  }
+
+  /* Collapsing hides bodies with a class rather than rebuilding the list, so the
+     field you are typing in keeps focus when the selection follows the caret. */
+  function markSelection() {
+    rowEls.forEach(function (r, i) {
+      r.classList.toggle("sel", i === selected);
+      var b = r.querySelector(".cmd-body");
+      if (b) b.classList.toggle("hidden", compact && i !== selected);
+    });
+    Array.prototype.forEach.call(mapBlocks.querySelectorAll(".blk"), function (b) {
+      var from = parseInt(b.getAttribute("data-from"), 10);
+      var to   = parseInt(b.getAttribute("data-to"), 10);
+      b.classList.toggle("sel", !isNaN(from) && selected >= from && selected <= to);
+    });
+  }
+
+  function focusCommand(i) {
+    selected = i;
+    markSelection();
+    var row = rowEls[i];
+    if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  /* ---------------------------------------------------------------- output */
+
+  function buildScene() {
+    var o = { id: sceneId, commands: cmds.map(function (e) {
+      return specFor(e.cmd).to(e);
+    }) };
+    Object.keys(extras).forEach(function (k) { if (!(k in o)) o[k] = extras[k]; });
+    return o;
+  }
+
+  /* JSON.stringify with an indent explodes every command over six lines, which
+     makes a scene unreadable. This keeps anything that fits on one line on one
+     line, and only breaks the ones that do not — matching how the sample script
+     in the engine repo is written by hand. */
+  function compactJson(v) {
+    if (Array.isArray(v)) return "[" + v.map(compactJson).join(", ") + "]";
+    if (T.isPlainObject(v)) {
+      var parts = Object.keys(v).map(function (k) {
+        return JSON.stringify(k) + ": " + compactJson(v[k]);
+      });
+      return parts.length ? "{ " + parts.join(", ") + " }" : "{}";
+    }
+    return JSON.stringify(v);
+  }
+
+  function spaces(n) { return n > 0 ? new Array(n + 1).join(" ") : ""; }
+
+  /* indent = where the line this value starts on is indented to, col = the
+     column the value itself begins at. They differ for an object member, whose
+     value starts after `"key": ` but whose closing brace lines up with the key. */
+  function fmt(v, indent, col, width) {
+    var one = compactJson(v);
+    if (col + one.length <= width) return one;
+    var pad = spaces(indent + 4);
+    var close = spaces(indent);
+    if (Array.isArray(v)) {
+      if (!v.length) return "[]";
+      return "[\n" + v.map(function (x) {
+        return pad + fmt(x, indent + 4, indent + 4, width);
+      }).join(",\n") + "\n" + close + "]";
+    }
+    if (T.isPlainObject(v)) {
+      var keys = Object.keys(v);
+      if (!keys.length) return "{}";
+      return "{\n" + keys.map(function (k) {
+        var head = pad + JSON.stringify(k) + ": ";
+        return head + fmt(v[k], indent + 4, head.length, width);
+      }).join(",\n") + "\n" + close + "}";
+    }
+    return one;
+  }
+
+  function commandLines(list) {
+    var out = [];
+    list.forEach(function (c, i) {
+      var blank = false;
+      if (i > 0) {
+        if (c.cmd === "label") blank = true;
+        if (branches(list[i - 1])) blank = true;
+      }
+      if (blank) out.push("");
+      out.push("        " + fmt(c, 8, 8, LINE_WIDTH) + (i < list.length - 1 ? "," : ""));
+    });
+    return out.join("\n");
+  }
+
+  function formatScene() {
+    var scene = buildScene();
+    var parts = [];
+    parts.push('    "id": ' + JSON.stringify(scene.id));
+    parts.push('    "commands": [' + (scene.commands.length ? "\n" + commandLines(scene.commands) + "\n    " : "") + "]");
+    Object.keys(scene).forEach(function (k) {
+      if (k === "id" || k === "commands") return;
+      var head = '    ' + JSON.stringify(k) + ": ";
+      parts.push(head + fmt(scene[k], 4, head.length, LINE_WIDTH));
+    });
+    return "{\n" + parts.join(",\n") + "\n}\n";
+  }
+
+  /* ----------------------------------------------------------------- graph */
+  /*
+     Blocks are runs of commands with one way in at the top. A new block starts
+     at a label and after every branching command, which is exactly where the
+     engine's cmdIndex can arrive from somewhere else.
+  */
+
+  function buildGraph() {
+    var labels = bag(), dupes = [];
+    cmds.forEach(function (c, i) {
+      if (c.cmd !== "label" || !c.label) return;
+      if (labels[c.label] !== undefined) dupes.push({ name: c.label, first: labels[c.label], at: i });
+      labels[c.label] = i;                 /* last one wins, like GameEngine.loadScene */
+    });
+
+    var startsAt = bag();
+    if (cmds.length) startsAt[0] = true;
+    cmds.forEach(function (c, i) {
+      if (c.cmd === "label") startsAt[i] = true;
+      if (branches(c) && i + 1 < cmds.length) startsAt[i + 1] = true;
+    });
+
+    var starts = Object.keys(startsAt).map(Number).sort(function (a, b) { return a - b; });
+    var blocks = starts.map(function (s, n) {
+      var end = (n + 1 < starts.length ? starts[n + 1] : cmds.length) - 1;
+      return { i: n, from: s, to: end, name: cmds[s] && cmds[s].cmd === "label" ? cmds[s].label : null,
+               out: [], reach: false };
+    });
+    var blockAt = bag();
+    blocks.forEach(function (b) { blockAt[b.from] = b.i; });
+    function blockOfIndex(i) {
+      for (var n = blocks.length - 1; n >= 0; n--) if (blocks[n].from <= i) return n;
+      return -1;
+    }
+
+    var externals = [];
+    function externalNode(name) {
+      for (var i = 0; i < externals.length; i++) if (externals[i].name === name) return externals[i];
+      var node = { name: name, i: blocks.length + externals.length, ext: true };
+      externals.push(node);
+      return node;
+    }
+
+    function resolve(t, kind, tag, fromBlock) {
+      if (!t || t.kind === "none" || !t.name) return null;
+      if (t.kind === "scene") {
+        return { to: externalNode(t.name).i, kind: kind, tag: tag, ext: true, name: t.name };
+      }
+      if (labels[t.name] === undefined) {
+        return { to: -1, kind: kind, tag: tag, missing: t.name };
+      }
+      return { to: blockOfIndex(labels[t.name]), kind: kind, tag: tag, name: t.name };
+    }
+
+    blocks.forEach(function (b) {
+      var last = cmds[b.to];
+      var next = b.i + 1 < blocks.length ? b.i + 1 : -1;
+      if (!last) { b.out.push({ to: next, kind: "fall", tag: "" }); return; }
+
+      if (last.cmd === "jump") {
+        var e = resolve(last._t, "jump", "", b.i);
+        if (e) b.out.push(e);
+        else b.out.push({ to: next, kind: "fall", tag: "no target — falls through" });
+
+      } else if (last.cmd === "jump_if") {
+        var t = resolve(last._t, "cond", condText(last.condition), b.i);
+        if (t) b.out.push(t);
+        b.out.push({ to: next, kind: "fall", tag: "otherwise" });
+
+      } else if (last.cmd === "choice") {
+        last.options.forEach(function (o, n) {
+          var tag = "“" + clip(o._mode === "key" ? "[" + o.text_key + "]" : o.text, 26) + "”";
+          var e = resolve(o._t, "choice", tag, b.i);
+          if (e) b.out.push(e);
+          else b.out.push({ to: next, kind: "choicefall", tag: tag + " falls through" });
+        });
+        if (!last.options.length) b.out.push({ to: next, kind: "fall", tag: "no options" });
+
+      } else if (last.cmd === "end") {
+        b.out.push({ to: next, kind: "fall", tag: "end is not implemented — steps past" });
+
+      } else {
+        b.out.push({ to: next, kind: "fall", tag: "" });
+      }
+    });
+
+    /* reachability from the first block */
+    if (blocks.length) {
+      var queue = [0];
+      blocks[0].reach = true;
+      while (queue.length) {
+        var b = blocks[queue.shift()];
+        b.out.forEach(function (e) {
+          if (e.to < 0 || e.to >= blocks.length) return;
+          if (blocks[e.to].reach) return;
+          blocks[e.to].reach = true;
+          queue.push(e.to);
+        });
+      }
+    }
+
+    /* a cycle the engine would walk without ever stopping for the player is a
+       synchronous recursion in processNext(), i.e. a stack overflow */
+    var spins = findSpins(blocks);
+
+    return { blocks: blocks, externals: externals, labels: labels, dupes: dupes,
+             blockOfIndex: blockOfIndex, spins: spins };
+  }
+
+  function findSpins(blocks) {
+    var halting = blocks.map(function (b) {
+      for (var i = b.from; i <= b.to; i++) if (cmds[i] && halts(cmds[i])) return true;
+      return false;
+    });
+    var state = blocks.map(function () { return 0; });   /* 0 new, 1 on stack, 2 done */
+    var stack = [], found = [];
+
+    function walk(n) {
+      if (n < 0 || n >= blocks.length) return;
+      if (halting[n]) return;                 /* execution pauses here, the stack unwinds */
+      if (state[n] === 1) {
+        found.push(stack.slice(stack.indexOf(n)).map(function (x) { return blocks[x]; }));
+        return;
+      }
+      if (state[n] === 2) return;
+      state[n] = 1;
+      stack.push(n);
+      blocks[n].out.forEach(function (e) {
+        if (e.kind === "choice" || e.kind === "choicefall") return;   /* waits for a tap */
+        walk(e.to);
+      });
+      stack.pop();
+      state[n] = 2;
+    }
+    blocks.forEach(function (b, n) { if (state[n] === 0) walk(n); });
+    return found;
+  }
+
+  /* ------------------------------------------------------------------- map */
+
+  var GUTTER = 46;
+
+  function renderMap(g) {
+    mapBlocks.innerHTML = "";
+    mapArcs.innerHTML = "";
+    mapBlocks.style.marginLeft = GUTTER + "px";
+
+    if (!cmds.length) {
+      mapBlocks.appendChild(elt("p", "map-empty", "Nothing to map yet."));
+      mapMeta.textContent = "";
+      return;
+    }
+
+    var els = [];
+
+    g.blocks.forEach(function (b) {
+      var box = elt("div", "blk" + (b.i === 0 ? " entry" : "") + (b.reach ? "" : " unreach"));
+      box.setAttribute("data-from", b.from);
+      box.setAttribute("data-to", b.to);
+
+      var title = elt("div", "blk-title");
+      title.appendChild(elt("span", null, b.name ? b.name : (b.i === 0 ? "scene start" : "…")));
+      title.appendChild(elt("span", "n", "#" + b.from + (b.to > b.from ? "–" + b.to : "")));
+      if (!b.reach) title.appendChild(elt("span", "flag", "never reached"));
+      box.appendChild(title);
+
+      /* the label at the top and the branch at the bottom are already the block's
+         heading and its exit lines, so the body only lists what is between them */
+      var first = b.from + (b.name ? 1 : 0);
+      var last  = b.to - (cmds[b.to] && branches(cmds[b.to]) ? 1 : 0);
+      var lines = elt("p", "blk-lines");
+      var shown = 0;
+      for (var i = first; i <= last && shown < 4; i++) {
+        var c = cmds[i];
+        if (!c) break;
+        var spec = specFor(c.cmd);
+        var line = elt("span");
+        line.textContent = spec.title + "  " + clip(spec.summary(c), 46);
+        line.className = c.cmd === "say" ? "" : "muted";
+        lines.appendChild(line);
+        lines.appendChild(elt("br"));
+        shown++;
+      }
+      var total = Math.max(0, last - first + 1);
+      if (total > shown) lines.appendChild(elt("span", "muted", "+ " + (total - shown) + " more"));
+      if (lines.childNodes.length) box.appendChild(lines);
+
+      var exit = elt("p", "blk-exit");
+      b.out.forEach(function (e) {
+        var span = elt("span");
+        var cls = e.kind === "jump" ? "e-jump" : e.kind === "cond" ? "e-cond"
+                : (e.kind === "choice" || e.kind === "choicefall") ? "e-choice" : "e-fall";
+        if (e.missing) {
+          span.className = "e-stop";
+          span.textContent = "✗ no label “" + e.missing + "” in this scene";
+        } else if (e.to === -1) {
+          span.className = "e-stop";
+          span.textContent = "✗ runs off the end of the scene";
+        } else if (e.ext) {
+          span.className = cls;
+          span.textContent = "→ " + e.name + (e.tag ? "  " + e.tag : "");
+        } else if (e.to === b.i + 1) {
+          span.className = cls === "e-fall" ? "e-fall" : cls;
+          span.textContent = "↓ " + (e.tag || "continues");
+        } else {
+          span.className = cls;
+          span.textContent = "→ " + (e.name || "block " + e.to) + (e.tag ? "  " + e.tag : "");
+        }
+        exit.appendChild(span);
+        exit.appendChild(elt("br"));
+      });
+      box.appendChild(exit);
+
+      box.addEventListener("click", function () { focusCommand(b.from); });
+      mapBlocks.appendChild(box);
+      els[b.i] = box;
+    });
+
+    g.externals.forEach(function (x) {
+      var box = elt("div", "blk ext");
+      var title = elt("div", "blk-title");
+      title.appendChild(elt("span", null, x.name));
+      var known = Object.prototype.hasOwnProperty.call(siblings, x.name);
+      title.appendChild(elt("span", "n", known ? "another scene, loaded" : "another scene"));
+      if (!known && Object.keys(siblings).length)
+        title.appendChild(elt("span", "flag", "not among the loaded scenes"));
+      box.appendChild(title);
+      mapBlocks.appendChild(box);
+      els[x.i] = box;
+    });
+
+    var reached = g.blocks.filter(function (b) { return b.reach; }).length;
+    mapMeta.textContent = g.blocks.length + (g.blocks.length === 1 ? " block" : " blocks") +
+      ", " + reached + " reachable · " + cmds.length + " commands";
+  }
+
+  function drawArcs(g, els) {
+    var edges = [];
+    g.blocks.forEach(function (b) {
+      b.out.forEach(function (e) {
+        if (e.to < 0 || !els[e.to]) return;
+        if (e.to === b.i + 1) return;                /* drawn as the ↓ line instead */
+        edges.push({ from: b.i, to: e.to, kind: e.kind, tag: e.tag, name: e.name });
+      });
+    });
+    if (!edges.length) {
+      mapArcs.setAttribute("width", GUTTER);
+      mapArcs.setAttribute("height", 1);
+      return;
+    }
+
+    var base = mapCanvas.getBoundingClientRect();
+    function y(el, bottom) {
+      var r = el.getBoundingClientRect();
+      return Math.round((bottom ? r.bottom - 12 : r.top + 12) - base.top);
+    }
+
+    edges.forEach(function (e) {
+      e.y1 = y(els[e.from], true);
+      e.y2 = y(els[e.to], false);
+      e.span = Math.abs(e.y2 - e.y1);
+    });
+    edges.sort(function (a, b) { return a.span - b.span; });
+
+    var lanes = [];
+    edges.forEach(function (e) {
+      var lo = Math.min(e.y1, e.y2), hi = Math.max(e.y1, e.y2), l = 0;
+      for (; l < lanes.length; l++) {
+        var clash = lanes[l].some(function (iv) { return !(hi < iv[0] - 6 || lo > iv[1] + 6); });
+        if (!clash) break;
+      }
+      if (l === lanes.length) lanes.push([]);
+      if (l > 3) l = 3;
+      if (!lanes[l]) lanes[l] = [];
+      lanes[l].push([lo, hi]);
+      e.lane = l;
+    });
+
+    var COLOURS = { jump: "#6ec8ff", cond: "#ffb454", choice: "#8fd694", choicefall: "#8fd694", fall: "#6f7689" };
+    var svgns = "http://www.w3.org/2000/svg";
+    var defs = document.createElementNS(svgns, "defs");
+    Object.keys(COLOURS).forEach(function (k) {
+      var m = document.createElementNS(svgns, "marker");
+      m.setAttribute("id", "ah-" + k);
+      m.setAttribute("viewBox", "0 0 8 8");
+      m.setAttribute("refX", "7"); m.setAttribute("refY", "4");
+      m.setAttribute("markerWidth", "6"); m.setAttribute("markerHeight", "6");
+      m.setAttribute("orient", "auto");
+      var p = document.createElementNS(svgns, "path");
+      p.setAttribute("d", "M0,0 L8,4 L0,8 z");
+      p.setAttribute("fill", COLOURS[k]);
+      m.appendChild(p);
+      defs.appendChild(m);
+    });
+    mapArcs.appendChild(defs);
+
+    var height = mapCanvas.scrollHeight || mapBlocks.scrollHeight;
+    mapArcs.setAttribute("width", GUTTER);
+    mapArcs.setAttribute("height", height);
+    mapArcs.style.width = GUTTER + "px";
+    mapArcs.style.height = height + "px";
+
+    edges.forEach(function (e) {
+      var x = GUTTER - 12 - e.lane * 10;
+      var r = 6;
+      var dir = e.y2 > e.y1 ? 1 : -1;
+      var d;
+      if (Math.abs(e.y2 - e.y1) < 2 * r + 2) {
+        d = "M " + (GUTTER - 3) + " " + e.y1 + " L " + x + " " + e.y1 +
+            " L " + x + " " + e.y2 + " L " + (GUTTER - 5) + " " + e.y2;
+      } else {
+        d = "M " + (GUTTER - 3) + " " + e.y1 +
+            " H " + (x + r) +
+            " Q " + x + " " + e.y1 + " " + x + " " + (e.y1 + dir * r) +
+            " V " + (e.y2 - dir * r) +
+            " Q " + x + " " + e.y2 + " " + (x + r) + " " + e.y2 +
+            " H " + (GUTTER - 5);
+      }
+      var path = document.createElementNS(svgns, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", COLOURS[e.kind] || "#6f7689");
+      path.setAttribute("stroke-width", "1.4");
+      path.setAttribute("marker-end", "url(#ah-" + (COLOURS[e.kind] ? e.kind : "fall") + ")");
+      var title = document.createElementNS(svgns, "title");
+      title.textContent = (e.tag ? e.tag + " → " : "→ ") + (e.name || "");
+      path.appendChild(title);
+      mapArcs.appendChild(path);
+    });
+  }
+
+  /* --------------------------------------------------------------- notices */
+
+  function pushNote(list, level, html, at) { list.push({ level: level, html: html, at: at }); }
+
+  function checkNotices(g) {
+    var out = [];
+    var declaredVars = manifest ? manifest.vars : null;
+    var declaredSet  = manifest ? manifest.settings : null;
+
+    /* variables the script itself creates count as declared for the name checks */
+    var written = bag();
+    cmds.forEach(function (c) {
+      if (c.cmd === "set" && c["var"]) written[c["var"]] = true;
+      if (c.cmd === "choice") c.options.forEach(function (o) {
+        o.effects.forEach(function (fx) { if (fx["var"]) written[fx["var"]] = true; });
+      });
+    });
+
+    function knownVar(n)     { return (declaredVars && declaredVars[n] !== undefined) || written[n]; }
+    function knownSetting(n) { return declaredSet && declaredSet[n] !== undefined; }
+
+    if (!sceneId.trim())
+      pushNote(out, "warn", "The scene has no id.");
+    else if (!/^[A-Za-z0-9_\-]+$/.test(sceneId.trim()))
+      pushNote(out, "warn", "<code>" + esc(sceneId) + "</code> is not a plain file name — the " +
+        "engine loads it as <code>script/&lt;id&gt;.json</code>.");
+
+    if (!cmds.length) {
+      pushNote(out, "info", "Empty scene.");
+      return paint(out);
+    }
+
+    /* --- flow ---------------------------------------------------------- */
+
+    g.dupes.forEach(function (d) {
+      pushNote(out, "warn", "Label <code>" + esc(d.name) + "</code> is declared twice. The engine " +
+        "indexes labels in order, so every jump lands on the later one at #" + d.at + ".", d.at);
+    });
+
+    Object.keys(g.labels).forEach(function (name) {
+      if (!NAME_RE.test(name)) return;
+    });
+    cmds.forEach(function (c, i) {
+      if (c.cmd === "label" && !str(c.label).trim())
+        pushNote(out, "warn", "This label has no name, so nothing can jump to it.", i);
+    });
+
+    var targeted = bag();
+    function noteTarget(t, i, what) {
+      if (!t || t.kind === "none" || !t.name) return;
+      if (t.kind === "label") {
+        targeted[t.name] = true;
+        if (g.labels[t.name] === undefined)
+          pushNote(out, "err", what + "jumps to <code>" + esc(t.name) + "</code>, which is not a " +
+            "label in this scene. Labels are per scene — the engine warns and carries straight on.", i);
+      } else {
+        if (Object.keys(siblings).length && !siblings[t.name])
+          pushNote(out, "warn", what + "jumps to scene <code>" + esc(t.name) + "</code>, which is " +
+            "not among the scene files you loaded.", i);
+      }
+    }
+
+    cmds.forEach(function (c, i) {
+      if (c.cmd === "jump" || c.cmd === "jump_if") noteTarget(c._t, i, "");
+      if (c.cmd === "choice") c.options.forEach(function (o, n) {
+        noteTarget(o._t, i, "Option " + (n + 1) + " ");
+      });
+      if (c._extra && c._extra.scene && (c.cmd === "jump" || c.cmd === "jump_if"))
+        pushNote(out, "warn", "This command has both a <code>label</code> and a <code>scene</code> " +
+          "key. The engine checks <code>label</code> first, so the scene key never runs.", i);
+
+      if (c.cmd === "choice") c.options.forEach(function (o, n) {
+        var x = o._extra || {};
+        if (x.next !== undefined)
+          pushNote(out, "err", "Option " + (n + 1) + " routes with <code>next</code>. The engine " +
+            "reads <code>label</code> and <code>scene</code> — <code>next</code> is a shape from an " +
+            "older draft of the design document and does nothing, so the option silently falls " +
+            "through to the command after the choice.", i);
+        if (x.alt_scene !== undefined)
+          pushNote(out, "warn", "Option " + (n + 1) + " carries <code>alt_scene</code>, which the " +
+            "engine has no code for. It is kept in the file and ignored at runtime.", i);
+        if (x.scene !== undefined && o._t.kind === "label")
+          pushNote(out, "warn", "Option " + (n + 1) + " has both a <code>label</code> and a " +
+            "<code>scene</code> key. The engine checks <code>label</code> first, so the scene key " +
+            "never runs.", i);
+      });
+
+      if (c.cmd === "set" && c._converted)
+        pushNote(out, "info", "Loaded with <code>from_setting</code> and rewritten as " +
+          "<code>\"from\": { \"setting\": … }</code>. The design document uses the first shape; " +
+          "<code>resolveSetValue()</code> in the engine reads the second.", i);
+    });
+
+    Object.keys(g.labels).forEach(function (name) {
+      if (!targeted[name])
+        pushNote(out, "info", "Nothing jumps to <code>" + esc(name) + "</code>. That is fine if it " +
+          "is only a fall-through marker, and a typo somewhere if it is not.", g.labels[name]);
+    });
+
+    g.blocks.forEach(function (b) {
+      if (!b.reach)
+        pushNote(out, "warn", "Never reached — commands #" + b.from + "–" + b.to + ".", b.from);
+      b.out.forEach(function (e) {
+        if (e.to === -1 && !e.missing)
+          pushNote(out, "err", "Execution can run off the end of the scene here. A scene has to end with a jump — the engine treats falling off the end as an " +
+            "authoring error and drops the player back out of the game screen.", b.to);
+      });
+    });
+
+    g.spins.forEach(function (cycle) {
+      var names = cycle.map(function (b) { return b.name || "#" + b.from; }).join(" → ");
+      pushNote(out, "err", "Endless loop with nothing to tap through: " + esc(names) + " → " +
+        esc(cycle[0].name || "#" + cycle[0].from) + ". The engine calls the next command from " +
+        "inside the previous one, so a loop with no <code>say</code> or <code>choice</code> in it " +
+        "recurses until the stack gives out.", cycle[0].from);
+    });
+
+    /* --- per command ---------------------------------------------------- */
+
+    var planned = bag();
+    var speakers = bag();
+
+    cmds.forEach(function (c, i) {
+      var spec = specFor(c.cmd);
+      if (!spec.impl) planned[c.cmd] = true;
+
+      if (c.cmd === "say") {
+        if (c.speaker.trim()) speakers[c.speaker.trim()] = true;
+        if (c._mode === "text" && !c.text.trim())
+          pushNote(out, "warn", "An empty line of dialogue.", i);
+        if (c._mode === "key" && !c.text_key.trim())
+          pushNote(out, "warn", "No text key.", i);
+      }
+
+      if (c.cmd === "bg" && !c.image.trim())
+        pushNote(out, "warn", "No background image.", i);
+
+      if (c.cmd === "sprite") {
+        if (!c.id.trim())    pushNote(out, "warn", "No sprite id.", i);
+        if (!c.image.trim()) pushNote(out, "warn", "No sprite image.", i);
+        var p = c.position.trim();
+        if (p && ["left", "right", "center", "centre"].indexOf(p) === -1 && p.indexOf("%") === -1)
+          pushNote(out, "info", "Position <code>" + esc(p) + "</code> is not one of " +
+            "left/right/center and has no percent sign, so the engine centres the sprite.", i);
+      }
+
+      ["image", "file"].forEach(function (k) {
+        var v = str(c[k]).trim();
+        if (!v) return;
+        if (v.charAt(0) === "/" || v.indexOf("assets/") === 0)
+          pushNote(out, "warn", "<code>" + esc(v) + "</code> — paths are relative to " +
+            "<code>assets/</code>, which the engine adds itself.", i);
+      });
+
+      if (c.cmd === "set") {
+        if (!c["var"].trim()) pushNote(out, "warn", "Sets no variable.", i);
+        else if (!NAME_RE.test(c["var"].trim()))
+          pushNote(out, "warn", "<code>" + esc(c["var"]) + "</code> cannot be used in " +
+            "text — <code>%name%</code> only matches letters, digits and underscores.", i);
+        if (c._src !== "value" && !c.from[c._src].trim())
+          pushNote(out, "warn", "Takes its value from a " + c._src + " with no name.", i);
+        if (c._src === "var" && c.from["var"] && !knownVar(c.from["var"]))
+          pushNote(out, "warn", "Reads <code>" + esc(c.from["var"]) + "</code>, which " +
+            "nothing in this scene sets" + (manifest ? " and the manifest does not declare" : "") + ".", i);
+        if (c._src === "setting" && c.from.setting && manifest && !knownSetting(c.from.setting))
+          pushNote(out, "warn", "Reads the setting <code>" + esc(c.from.setting) +
+            "</code>, which the manifest does not declare.", i);
+      }
+
+      if (c.cmd === "choice") {
+        if (!c.options.length)
+          pushNote(out, "err", "A choice with no options.", i);
+        else {
+          var unconditional = c.options.some(function (o) { return !condTo(o.condition); });
+          if (!unconditional)
+            pushNote(out, "warn", "Every option of this choice is conditional. If they all evaluate " +
+              "false the engine warns and skips the whole choice, and the player never sees it.", i);
+          c.options.forEach(function (o, n) {
+            var txt = o._mode === "key" ? o.text_key : o.text;
+            if (!str(txt).trim())
+              pushNote(out, "warn", "Option " + (n + 1) + " has no text.", i);
+          });
+        }
+      }
+
+      if (c.cmd === "jump_if" && !condTo(c.condition))
+        pushNote(out, "warn", "No condition, so this always jumps — the same as a " +
+          "plain <code>jump</code>.", i);
+
+      if (c.cmd === "style" && !c.style.trim())
+        pushNote(out, "warn", "Names no style id.", i);
+
+      if (c.cmd === "__raw") {
+        try { JSON.parse(c._text); }
+        catch (x) { pushNote(out, "err", "Not valid JSON: " + esc(x.message), i); }
+      }
+
+      /* conditions and effects everywhere */
+      collectConditions(c).forEach(function (cd) {
+        if (!cd.name.trim()) return;
+        if (cd._src === "setting" && manifest && !knownSetting(cd.name))
+          pushNote(out, "warn", "Tests the setting <code>" + esc(cd.name) + "</code>, " +
+            "which the manifest does not declare. An unknown setting reads as undefined and the " +
+            "condition comes out false.", i);
+        if (cd._src === "var" && !knownVar(cd.name))
+          pushNote(out, "warn", "Tests <code>" + esc(cd.name) + "</code>, which nothing " +
+            "in this scene sets" + (manifest ? " and the manifest does not declare" : "") +
+            ". An undefined variable makes the condition false.", i);
+        if (cd._src === "flag" && manifest && !knownVar(cd.name) && !knownSetting(cd.name))
+          pushNote(out, "warn", "Tests the flag <code>" + esc(cd.name) + "</code>, which " +
+            "is neither a declared variable nor a setting. A flag looks in both and comes out " +
+            "false when it finds neither.", i);
+        if (cd.op && manifest && cd._src === "var" && declaredVars[cd.name]) {
+          var want = declaredVars[cd.name];
+          var got  = cd._vtype === "number" ? "number" : cd._vtype === "bool" ? "bool" : "string";
+          var wantKind = (want === "int" || want === "float") ? "number" : want;
+          if (wantKind && wantKind !== got)
+            pushNote(out, "warn", "Compares <code>" + esc(cd.name) + "</code> (declared " +
+              "<code>" + esc(want) + "</code>) against a " + got + ". Comparison is strict, so this " +
+              "is never equal.", i);
+        }
+      });
+
+      collectEffects(c).forEach(function (fx) {
+        if (fx["var"] && !NAME_RE.test(fx["var"]))
+          pushNote(out, "warn", "Effect on <code>" + esc(fx["var"]) + "</code> — that " +
+            "name cannot be used in text.", i);
+        if (fx["var"] && manifest && declaredVars[fx["var"]] === undefined && !written[fx["var"]])
+          pushNote(out, "info", "Changes <code>" + esc(fx["var"]) + "</code>, which the " +
+            "manifest does not declare. It still works — it just starts undefined, and " +
+            "<code>mul</code> on it gives 0.", i);
+      });
+
+      /* %interpolation% */
+      textsOf(c).forEach(function (txt) {
+        var m;
+        INTERP_RE.lastIndex = 0;
+        while ((m = INTERP_RE.exec(txt)) !== null) {
+          var n = m[1];
+          if (knownVar(n) || knownSetting(n)) continue;
+          if (!manifest) continue;
+          pushNote(out, "warn", "Writes <code>%" + esc(n) + "%</code>, which is neither " +
+            "a declared variable nor a setting. The engine leaves it on screen as written.", i);
+        }
+      });
+    });
+
+    if (Object.keys(planned).length)
+      pushNote(out, "info", "Uses commands the engine does not run yet: <code>" +
+        Object.keys(planned).map(esc).join("</code>, <code>") + "</code>. They are logged and " +
+        "skipped, so the scene still plays — those beats just do nothing.");
+
+    /* anything this generator has no editor for still ends up in the file */
+    var kept = bag(), rawCmds = bag();
+    cmds.forEach(function (c) {
+      if (c.cmd === "__raw") {
+        var parsed = null;
+        try { parsed = JSON.parse(c._text); } catch (x) { /* already reported */ }
+        if (parsed && parsed.cmd) rawCmds[String(parsed.cmd)] = true;
+        return;
+      }
+      Object.keys(c._extra || {}).forEach(function (k) { kept[k] = true; });
+      if (c.cmd === "choice") c.options.forEach(function (o) {
+        Object.keys(o._extra || {}).forEach(function (k) { kept[k] = true; });
+      });
+    });
+    Object.keys(extras).forEach(function (k) { kept[k] = true; });
+    if (Object.keys(rawCmds).length)
+      pushNote(out, "info", "Commands with no editor here, kept exactly as you loaded them: " +
+        "<code>" + Object.keys(rawCmds).map(esc).join("</code>, <code>") + "</code>.");
+    if (Object.keys(kept).length)
+      pushNote(out, "info", "Keys this generator does not model, written back unchanged: <code>" +
+        Object.keys(kept).map(esc).join("</code>, <code>") + "</code>.");
+
+    if (!manifest)
+      pushNote(out, "info", "No manifest loaded, so variable and setting names are not checked " +
+        "against your game.");
+    if (!Object.keys(siblings).length)
+      pushNote(out, "info", "No other scenes loaded, so jumps to another scene are not checked.");
+
+    if (manifest && manifest.entry && manifest.entry === sceneId.trim())
+      pushNote(out, "info", "This is the entry scene named in the manifest.");
+
+    /* speaker datalist comes free from the same walk */
+    fillList("dlSpeaker", Object.keys(speakers));
+
+    paint(out);
+  }
+
+  function paint(list) {
+    noticeBox.innerHTML = "";
+    var order = { err: 0, warn: 1, info: 2 };
+    list.sort(function (a, b) { return order[a.level] - order[b.level]; });
+    list.forEach(function (n) {
+      var p = elt("p", "notice " + (n.level === "info" ? "" : n.level === "err" ? "err" : "warn"));
+      if (n.at !== undefined && n.at !== null) {
+        var b = elt("button", "goto", "#" + n.at);
+        b.type = "button";
+        b.addEventListener("click", function () { focusCommand(n.at); });
+        p.appendChild(b);
+      }
+      var span = elt("span");
+      span.innerHTML = n.html;
+      p.appendChild(span);
+      noticeBox.appendChild(p);
+    });
+    if (!list.length) noticeBox.appendChild(elt("p", "notice", "Nothing to report."));
+  }
+
+  function collectConditions(c) {
+    var out = [];
+    if (c.cmd === "jump_if" && c.condition) out.push(c.condition);
+    if (c.cmd === "choice") c.options.forEach(function (o) { if (o.condition) out.push(o.condition); });
+    return out;
+  }
+  function collectEffects(c) {
+    var out = [];
+    if (c.cmd === "choice") c.options.forEach(function (o) {
+      o.effects.forEach(function (fx) { out.push(fx); });
+    });
+    return out;
+  }
+  function textsOf(c) {
+    var out = [];
+    if (c.cmd === "say") { out.push(c.text); out.push(c.speaker); }
+    if (c.cmd === "choice") c.options.forEach(function (o) { out.push(o.text); });
+    return out.filter(function (s) { return str(s).indexOf("%") !== -1; });
+  }
+
+  /* ------------------------------------------------------------- datalists */
+
+  function fillList(id, values) {
+    var dl = document.getElementById(id);
+    if (!dl) return;
+    dl.innerHTML = "";
+    values.filter(function (v, i, a) { return v && a.indexOf(v) === i; })
+          .sort()
+          .forEach(function (v) {
+            var o = elt("option");
+            o.value = v;
+            dl.appendChild(o);
+          });
+  }
+
+  function refreshLists() {
+    var vars = [], settings = [], labels = [], scenes = [], sprites = [];
+    if (manifest) {
+      vars = Object.keys(manifest.vars);
+      settings = Object.keys(manifest.settings);
+    }
+    cmds.forEach(function (c) {
+      if (c.cmd === "set" && c["var"]) vars.push(c["var"]);
+      if (c.cmd === "label" && c.label) labels.push(c.label);
+      if (c.cmd === "sprite" && c.id) sprites.push(c.id);
+      if (c.cmd === "choice") c.options.forEach(function (o) {
+        o.effects.forEach(function (fx) { if (fx["var"]) vars.push(fx["var"]); });
+      });
+    });
+    scenes = Object.keys(siblings);
+    cmds.forEach(function (c) {
+      if ((c.cmd === "jump" || c.cmd === "jump_if") && c._t.kind === "scene" && c._t.name)
+        scenes.push(c._t.name);
+      if (c.cmd === "choice") c.options.forEach(function (o) {
+        if (o._t.kind === "scene" && o._t.name) scenes.push(o._t.name);
+      });
+    });
+    fillList("dlVar", vars);
+    fillList("dlSetting", settings);
+    fillList("dlAny", vars.concat(settings));
+    fillList("dlLabel", labels);
+    fillList("dlScene", scenes);
+    fillList("dlSprite", sprites);
+  }
+
+  /* ---------------------------------------------------------------- render */
+
+  var pending = null;
+
+  function touch() {
+    if (pending) return;
+    pending = requestAnimationFrame(function () { pending = null; render(); });
+  }
+
+  function redraw(focusIndex) {
+    renderCommands();
+    render();
+    if (focusIndex !== undefined && rowEls[focusIndex])
+      rowEls[focusIndex].scrollIntoView({ block: "nearest" });
+  }
+
+  function render() {
+    pathHint.textContent = "script/" + (sceneId || "scene_0001") + ".json";
+    refreshLists();
+
+    rowEls.forEach(function (row, i) {
+      var spec = specFor(cmds[i].cmd);
+      var sum = row.querySelector(".cmd-sum");
+      if (sum) sum.innerHTML = "<b>" + esc(spec.summary(cmds[i])) + "</b>";
+    });
+
+    listHint.textContent = cmds.length
+      ? cmds.length + (cmds.length === 1 ? " command." : " commands.") +
+        " Click a block on the map to jump to it here."
+      : "";
+
+    var g = buildGraph();
+    output.textContent = formatScene();
+    renderMap(g);
+    checkNotices(g);
+    markSelection();
+
+    /* the arcs need the laid-out heights */
+    requestAnimationFrame(function () { drawArcsAgain(g); });
+  }
+
+  var lastGraph = null;
+  function drawArcsAgain(g) {
+    lastGraph = g;
+    var els = [];
+    Array.prototype.forEach.call(mapBlocks.children, function (el, i) { els[i] = el; });
+    if (els.length) { mapArcs.innerHTML = ""; drawArcs(g, els); }
+  }
+
+  /* ------------------------------------------------------------ load files */
+
+  function entryFromJson(c) {
+    if (!T.isPlainObject(c)) return SPECS.__raw.from(c);
+    var spec = specFor(c.cmd);
+    if (spec.hidden) return SPECS.__raw.from(c);
+    return spec.from(c);
+  }
+
+  function loadSceneFile(data, filename) {
+    if (!T.isPlainObject(data) || !Array.isArray(data.commands)) {
+      alert("That file has no \"commands\" array, so it is not a VNgine scene.");
+      return;
+    }
+    sceneId = str(data.id) || str(filename).replace(/\.json$/i, "") || "scene_0001";
+    sceneIdEl.value = sceneId;
+    cmds = data.commands.map(entryFromJson);
+    extras = takeExtras(data, ["id", "commands"]);
+    selected = -1;
+    redraw();
+  }
+
+  function readManifest(data) {
+    if (!T.isPlainObject(data)) { alert("That is not a manifest."); return; }
+    var vars = bag(), settings = bag();
+    if (T.isPlainObject(data.variables))
+      Object.keys(data.variables).forEach(function (k) {
+        var v = data.variables[k];
+        vars[k] = T.isPlainObject(v) && v.type ? String(v.type) : "";
+      });
+    ["toggles", "dropdowns", "textfields", "sliders"].forEach(function (name) {
+      if (!T.isPlainObject(data[name])) return;
+      Object.keys(data[name]).forEach(function (k) {
+        settings[k] = name === "toggles" ? "bool"
+                    : name === "sliders" ? "int" : "string";
+      });
+    });
+    var channels = T.isPlainObject(data.audio_channels) ? Object.keys(data.audio_channels) : [];
+    fillList("dlChannel", channels);
+    manifest = { title: str(data.title) || "game.json", vars: vars, settings: settings,
+                 entry: str(data.entry_scene), channels: channels };
+    render();
+    renderChips();
+  }
+
+  function readSibling(data, filename) {
+    if (!T.isPlainObject(data) || !Array.isArray(data.commands)) return false;
+    var id = str(data.id) || str(filename).replace(/\.json$/i, "");
+    var labels = [];
+    data.commands.forEach(function (c) {
+      if (T.isPlainObject(c) && c.cmd === "label" && c.label) labels.push(String(c.label));
+    });
+    siblings[id] = { labels: labels, file: filename };
+    return true;
+  }
+
+  function renderChips() {
+    chipBox.innerHTML = "";
+    function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+    var m = elt("span", "chip" + (manifest ? " on" : ""),
+      manifest ? "manifest: " + manifest.title + " — " +
+                 plural(Object.keys(manifest.vars).length, "variable", "variables") + ", " +
+                 plural(Object.keys(manifest.settings).length, "setting", "settings")
+               : "no manifest");
+    chipBox.appendChild(m);
+    Object.keys(siblings).sort().forEach(function (id) {
+      chipBox.appendChild(elt("span", "chip on", id + " — " + siblings[id].labels.length + " labels"));
+    });
+    if (!Object.keys(siblings).length) chipBox.appendChild(elt("span", "chip", "no other scenes"));
+  }
+
+  /* ------------------------------------------------------------- the paste */
+
+  function parsePaste(text) {
+    var out = [];
+    text.split(/\r?\n/).forEach(function (raw, n) {
+      var line = raw.trim();
+      if (!line || line.slice(0, 2) === "//") return;
+
+      if (line.charAt(0) === "@") {
+        var bits = line.slice(1).split(/\s+/);
+        var head = (bits.shift() || "").toLowerCase();
+        var e = null;
+        if (head === "label" && bits[0])      { e = SPECS.label.make(); e.label = bits[0]; }
+        else if (head === "jump" && bits[0])  { e = SPECS.jump.make();  e._t = { kind: "label", name: bits[0] }; }
+        else if (head === "scene" && bits[0]) { e = SPECS.jump.make();  e._t = { kind: "scene", name: bits[0] }; }
+        else if (head === "bg" && bits[0])    { e = SPECS.bg.make(); e.image = bits[0];
+                                                if (bits[1]) e.transition = bits[1]; }
+        else if (head === "sprite" && bits[1]) { e = SPECS.sprite.make(); e.id = bits[0];
+                                                 e.image = bits[1]; e.position = bits[2] || "center"; }
+        else if (head === "remove" && bits[0]) { e = SPECS.sprite_remove.make(); e.id = bits[0]; }
+        else if (head === "set" && bits[2] !== undefined) {
+          e = SPECS.set.make();
+          e["var"] = bits[0];
+          e.op = ["set", "add", "sub", "mul"].indexOf(bits[1]) === -1 ? "set" : bits[1];
+          var rest = bits.slice(2).join(" ");
+          if (rest === "true" || rest === "false") { e._vtype = "bool"; e.value = rest === "true"; }
+          else if (rest !== "" && !isNaN(Number(rest))) { e._vtype = "number"; e.value = Number(rest); }
+          else { e._vtype = "string"; e.value = rest; }
+        }
+        else if (head === "style" && bits[1]) { e = SPECS.style.make(); e.category = bits[0]; e.style = bits[1]; }
+        else if (head === "wait" && bits[0])  { e = SPECS.wait.make(); e.ms = num(bits[0], 500); }
+        else if (head === "end")              { e = SPECS.end.make(); }
+
+        if (e) out.push({ entry: e });
+        else out.push({ error: "line " + (n + 1) + ": @" + head + " — not a shorthand command, " +
+                               "or missing what it needs" });
+        return;
+      }
+
+      if (line.charAt(0) === "-" && line.charAt(1) === " ") {
+        out.push({ entry: say("", line.slice(2).trim()) });
+        return;
+      }
+
+      var m = line.match(/^([^:]{1,48}?):\s+([\s\S]+)$/);
+      if (m && looksLikeName(m[1])) out.push({ entry: say(m[1].trim(), m[2].trim()) });
+      else out.push({ entry: say("", line) });
+    });
+    return out;
+  }
+
+  function looksLikeName(s) {
+    s = s.trim();
+    if (!s || /[.!?]/.test(s)) return false;
+    return s.split(/\s+/).length <= 4;
+  }
+  function say(speaker, text) {
+    var e = SPECS.say.make();
+    e.speaker = speaker;
+    e.text = text;
+    return e;
+  }
+
+  function renderPastePreview() {
+    var box = document.getElementById("pastePreview");
+    var text = document.getElementById("pasteBox").value;
+    if (!text.trim()) { box.textContent = "Nothing to read yet."; return; }
+    var parsed = parsePaste(text);
+    box.innerHTML = "";
+    var says = 0, others = 0, bad = 0;
+    parsed.forEach(function (p) {
+      var line = elt("div");
+      if (p.error) { line.className = "bad"; line.textContent = "! " + p.error; bad++; }
+      else {
+        var spec = SPECS[p.entry.cmd];
+        line.innerHTML = '<span class="k">' + esc(spec.title) + "</span>  " + esc(spec.summary(p.entry));
+        if (p.entry.cmd === "say") says++; else others++;
+      }
+      box.appendChild(line);
+    });
+    var sum = elt("div");
+    sum.style.color = "var(--fg-faint)";
+    sum.textContent = "— " + says + " say, " + others + " other" + (bad ? ", " + bad + " unreadable" : "");
+    box.appendChild(sum);
+  }
+
+  function applyPaste(at) {
+    var text = document.getElementById("pasteBox").value;
+    var parsed = parsePaste(text).filter(function (p) { return p.entry; });
+    if (!parsed.length) return;
+    var index = at === null ? cmds.length : at;
+    parsed.forEach(function (p, n) { cmds.splice(index + n, 0, p.entry); });
+    selected = index + parsed.length - 1;
+    document.getElementById("pasteBox").value = "";
+    renderPastePreview();
+    redraw(selected);
+  }
+
+  /* ------------------------------------------------------------- templates */
+
+  function freeLabel(stem) {
+    var used = {};
+    cmds.forEach(function (c) { if (c.cmd === "label" && c.label) used[c.label] = true; });
+    var n = 1;
+    while (used[stem + "_" + n]) n++;
+    return stem + "_" + n;
+  }
+
+  function insertAll(list) {
+    var at = selected >= 0 ? selected + 1 : cmds.length;
+    list.forEach(function (e, n) { cmds.splice(at + n, 0, e); });
+    selected = at;
+    redraw(at);
+  }
+
+  function tplIfElse() {
+    var n = freeLabel("branch").split("_").pop();
+    var thenL = "then_" + n, elseEnd = "after_" + n;
+    var j = SPECS.jump_if.make();
+    j._t = { kind: "label", name: thenL };
+    var elseSay = say("", "…what happens when the condition is false.");
+    var back = SPECS.jump.make();
+    back._t = { kind: "label", name: elseEnd };
+    var lab = SPECS.label.make(); lab.label = thenL;
+    var thenSay = say("", "…what happens when it is true.");
+    var end = SPECS.label.make(); end.label = elseEnd;
+    insertAll([j, elseSay, back, lab, thenSay, end]);
+  }
+
+  function tplChoice(count) {
+    var n = freeLabel("branch").split("_").pop();
+    var endL = "after_choice_" + n;
+    var ch = SPECS.choice.make();
+    ch.options = [];
+    var body = [];
+    for (var k = 1; k <= count; k++) {
+      var lab = "choice_" + n + "_" + k;
+      var o = newOption();
+      o.text = "Option " + k;
+      o._t = { kind: "label", name: lab };
+      ch.options.push(o);
+
+      var l = SPECS.label.make(); l.label = lab;
+      var s = say("", "…what option " + k + " leads to.");
+      var j = SPECS.jump.make(); j._t = { kind: "label", name: endL };
+      body.push(l, s, j);
+    }
+    var guard = SPECS.jump.make();
+    guard._t = { kind: "label", name: endL };
+    var end = SPECS.label.make(); end.label = endL;
+    insertAll([ch, guard].concat(body, [end]));
+  }
+
+  function tplLoop() {
+    var n = freeLabel("branch").split("_").pop();
+    var top = "loop_" + n;
+    var l = SPECS.label.make(); l.label = top;
+    var s = say("", "…the line the player sees each time round.");
+    var j = SPECS.jump_if.make();
+    j._t = { kind: "label", name: top };
+    insertAll([l, s, j]);
+  }
+
+  function tplGate() {
+    var n = freeLabel("branch").split("_").pop();
+    var skip = "skip_" + n;
+    var j = SPECS.jump_if.make();
+    j.condition = newCondition();
+    j.condition._src = "setting";
+    j._t = { kind: "label", name: skip };
+    var s = say("", "…the part that is skipped when the setting is on.");
+    var end = SPECS.label.make(); end.label = skip;
+    insertAll([j, s, end]);
+  }
+
+  /* --------------------------------------------------------------- wiring */
+
+  var quick = document.getElementById("quickAdd");
+  CMD_ORDER.forEach(function (k) {
+    var spec = SPECS[k];
+    var b = elt("button", spec.impl ? "" : "planned", spec.title);
+    b.type = "button";
+    b.title = spec.impl ? "" : "The engine does not run this command yet — it is logged and skipped.";
+    b.addEventListener("click", function () {
+      addCommand(k, selected >= 0 ? selected + 1 : cmds.length);
+    });
+    quick.appendChild(b);
+  });
+
+  var tpl = document.getElementById("templates");
+  [["Condition, two ways", tplIfElse],
+   ["Choice — 2 options", function () { tplChoice(2); }],
+   ["Choice — 3 options", function () { tplChoice(3); }],
+   ["Loop back until true", tplLoop],
+   ["Skip a section on a setting", tplGate]].forEach(function (t) {
+    var b = elt("button", "", t[0]);
+    b.type = "button";
+    b.addEventListener("click", t[1]);
+    tpl.appendChild(b);
+  });
+
+  sceneIdEl.addEventListener("input", function () { sceneId = sceneIdEl.value; touch(); });
+
+  document.getElementById("compact").addEventListener("change", function (e) {
+    compact = e.target.checked;
+    markSelection();
+  });
+
+  T.wireLoaders({
+    fileInput: document.getElementById("fileInput"),
+    dropZone:  document.getElementById("dropZone"),
+    onLoad: function (data, name) { loadSceneFile(data, name); }
+  });
+
+  document.getElementById("manifestInput").addEventListener("change", function (e) {
+    var f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      try { readManifest(JSON.parse(r.result)); }
+      catch (x) { alert("That is not valid JSON:\n" + x.message); }
+    };
+    r.readAsText(f);
+  });
+
+  document.getElementById("siblingInput").addEventListener("change", function (e) {
+    var files = Array.prototype.slice.call(e.target.files);
+    e.target.value = "";
+    var left = files.length;
+    if (!left) return;
+    files.forEach(function (f) {
+      var r = new FileReader();
+      r.onload = function () {
+        try { readSibling(JSON.parse(r.result), f.name); } catch (x) { /* skipped */ }
+        if (--left === 0) { renderChips(); render(); }
+      };
+      r.readAsText(f);
+    });
+  });
+
+  document.getElementById("clearContext").addEventListener("click", function () {
+    manifest = null;
+    siblings = {};
+    renderChips();
+    render();
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    sceneId = "scene_0001";
+    sceneIdEl.value = sceneId;
+    cmds = starter();
+    extras = {};
+    selected = -1;
+    redraw();
+  });
+
+  var pasteBox = document.getElementById("pasteBox");
+  pasteBox.addEventListener("input", renderPastePreview);
+  document.getElementById("pasteAppend").addEventListener("click", function () { applyPaste(null); });
+  document.getElementById("pasteInsert").addEventListener("click", function () {
+    applyPaste(selected >= 0 ? selected + 1 : cmds.length);
+  });
+  document.getElementById("pasteClear").addEventListener("click", function () {
+    pasteBox.value = "";
+    renderPastePreview();
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", function (e) {
+    T.copy(formatScene(), e.target);
+  });
+  document.getElementById("downloadBtn").addEventListener("click", function () {
+    T.download(formatScene(), (sceneId || "scene_0001") + ".json");
+  });
+
+  window.addEventListener("resize", function () {
+    if (lastGraph) drawArcsAgain(lastGraph);
+  });
+
+  /* ------------------------------------------------------------- start up */
+
+  function starter() {
+    var bg = SPECS.bg.make(); bg.image = "bg/centre_exterior_evening.png";
+    var s1 = say("", "You are at your local community centre.");
+    var s2 = say("Liisa", "There you are. I was starting to wonder.");
+    var j  = SPECS.jump.make(); j._t = { kind: "scene", name: "scene_0002" };
+    return [bg, s1, s2, j];
+  }
+
+  cmds = starter();
+  renderChips();
+  redraw();
+})();
+</script>
 </body>
 </html>

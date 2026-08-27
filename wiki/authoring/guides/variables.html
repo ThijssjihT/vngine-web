@@ -27,7 +27,7 @@
     <h2>Changing a variable</h2>
 <pre><code>{ "cmd": "set", "var": "panic", "op": "set", "value": 3 }
 { "cmd": "set", "var": "panic", "op": "add", "value": 6 }
-{ "cmd": "set", "var": "gold",  "op": "from", "from": { "setting": "starting_wealth" } }</code></pre>
+{ "cmd": "set", "var": "gold",  "op": "set", "from": { "setting": "starting_wealth" } }</code></pre>
     <table>
       <tr><th><code>op</code></th><th>Effect</th></tr>
       <tr><td><code>set</code></td><td>Replaces the value.</td></tr>
@@ -36,7 +36,9 @@
       <tr><td><code>mul</code></td><td>Multiplies. An unset variable counts as 0 — so multiplying an unset variable gives 0.</td></tr>
     </table>
     <p>Instead of a literal <code>value</code>, a command can take its value from somewhere else
-    with <code>from</code>:</p>
+    with <code>from</code>. <code>from</code> replaces the <em>value</em>, not the op — the op is
+    still one of the four above, so copying a setting into a variable is
+    <code>"op": "set"</code> with a <code>from</code> block:</p>
 <pre><code>"from": { "var": "gold" }              // another variable
 "from": { "setting": "difficulty" }    // a settings value</code></pre>
     <p>An unknown op, or a value that resolves to nothing, is logged and ignored rather than
