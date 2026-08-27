@@ -251,37 +251,7 @@ fieldset > .hint { font-size: .8rem; color: var(--fg-faint); margin: .4rem 0 0; 
 .match-groups .check { font-size: .85rem; }
 .match-groups .lbl { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--fg-faint); width: 100%; margin-top: .4rem; }
 
-/* --- full-width sticky preview band (choice generator) --- */
+/* --- roomier side column, for generators whose preview is landscape --- */
 
-.tool-preview {
-  grid-column: 1 / -1;
-  position: sticky;
-  top: 56px;
-  z-index: 5;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-  padding: .6rem 0 .7rem;
-  margin-bottom: .4rem;
-}
-.tool-preview .preview-head {
-  display: flex; align-items: center; gap: .8rem; justify-content: center;
-  margin-bottom: .6rem; flex-wrap: wrap;
-}
-.tool-preview .preview-head label { font-size: .82rem; color: var(--fg-dim); }
-.tool-preview .preview-head select { width: auto; min-width: 15rem; }
-.tool-preview .preview-head .row input { max-width: 6rem; }
-/* Width drives height through aspect-ratio, as in the base rule. The cap is a
-   max-width set inline by the page, computed from the wanted height and the
-   device aspect — setting height here instead would make both dimensions
-   definite, and aspect-ratio would be ignored. */
-.tool-preview .preview-frame {
-  width: 100%;
-  height: auto;
-  margin: 0 auto;
-}
-.tool-preview .preview-head #previewSize { width: 8rem; }
-.tool-preview .preview-meta { margin-top: .45rem; }
-
-@media (max-width: 1000px) {
-  .tool-preview { position: static; }
-}
+.tool.roomy { grid-template-columns: minmax(0, 1fr) minmax(0, 700px); }
+@media (max-width: 1180px) { .tool.roomy { grid-template-columns: 1fr; } }
