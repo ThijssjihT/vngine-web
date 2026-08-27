@@ -22,6 +22,8 @@
       <div class="preview-head">
         <label for="device">Preview on</label>
         <select id="device"></select>
+        <label for="previewSize">Size</label>
+        <input type="range" id="previewSize" min="150" max="560" step="10" value="240">
         <div class="custom-size" id="customSize" hidden>
           <div class="row">
             <input type="number" id="customW" min="120" value="1080"> ×
@@ -335,6 +337,7 @@
   var optEls    = frame.querySelectorAll(".preview-option");
   var warnEl    = document.getElementById("previewWarn");
   var metaEl    = document.getElementById("previewMeta");
+  var sizeEl    = document.getElementById("previewSize");
   var matchStateEl = document.getElementById("matchState");
   var applyBtn  = document.getElementById("applyMatch");
   var themedChk = document.getElementById("textThemed");
@@ -434,6 +437,7 @@
     customBox.hidden = !window.DEVICE_PROFILES[deviceSel.value].custom;
     render();
   });
+  sizeEl.addEventListener("input", renderPreview);
   document.getElementById("customW").addEventListener("input", render);
   document.getElementById("customH").addEventListener("input", render);
 
@@ -703,8 +707,14 @@
     var shortSide = Math.min(p.width, p.height);
     frame.style.aspectRatio = longSide + " / " + shortSide;
 
+    /* cap the frame by the height the user asked for, expressed as a max-width
+       so the aspect ratio still drives the height */
+    var wantH = parseInt(sizeEl.value, 10) || 240;
+    frame.style.maxWidth = (wantH * longSide / shortSide) + "px";
+
     var frameW = frame.clientWidth;
     var frameH = frame.clientHeight || (frameW * shortSide / longSide);
+    if (!frameW) return;
 
     var pixelRatio = shortSide / REF;
     var scale = (frameW / longSide) * pixelRatio;
