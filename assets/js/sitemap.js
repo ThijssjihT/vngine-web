@@ -59,8 +59,8 @@ window.SITE_MAP = {
   tools: [
     { title: "Textbox style",     path: "tools/textbox.html",   status: "ready",
       blurb: "Position, size, padding, background, border and radius for the dialogue box." },
-    { title: "Choice style",      path: "tools/choice.html",    status: "ready",
-      blurb: "Layout, background, border and text for the choice grid and each option. Can match an uploaded textbox style." },
+    { title: "Choice style",      path: "tools/choice.html",    status: "planned",
+      blurb: "Styling for the choice menu." },
     { title: "HUD style",         path: "tools/hud.html",       status: "planned",
       blurb: "Styling for the variable HUD overlay." },
     { title: "Manifest (game.json)", path: "tools/manifest.html", status: "planned",
