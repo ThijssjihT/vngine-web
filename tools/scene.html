@@ -23,7 +23,15 @@
 
       <fieldset>
         <legend>Scene</legend>
-        <div class="field">
+        <div class="btn-row">
+          <label class="btn" for="fileInput">Open a scene file…</label>
+          <input type="file" id="fileInput" accept=".json,application/json" hidden>
+          <button type="button" class="btn" id="resetBtn">Start over</button>
+        </div>
+        <div class="dropzone" id="dropZone">…or drop a <code>scene_NNNN.json</code> here</div>
+        <p class="hint">Commands and keys this generator does not model are kept exactly as they
+        were and written back out, so an unfamiliar file survives a round trip.</p>
+        <div class="field" style="margin-top:.9rem;">
           <label for="sceneId">Scene id</label>
           <input type="text" id="sceneId" value="scene_0001" spellcheck="false">
         </div>
@@ -33,7 +41,12 @@
       </fieldset>
 
       <fieldset>
-        <legend>Context — optional, makes the checks sharper</legend>
+        <legend>Context</legend>
+        <p class="hint">Optional — everything works without it. These files are only read to sharpen
+        the checks, and nothing is uploaded anywhere: they are read in your browser. The manifest
+        fills the variable and setting name lists and lets the tool warn about names your game never
+        declares. Other scene files let it check that a <code>jump</code> to another scene actually
+        goes somewhere.</p>
         <div class="btn-row">
           <label class="btn" for="manifestInput">Load game.json…</label>
           <input type="file" id="manifestInput" accept=".json,application/json" hidden>
@@ -41,10 +54,6 @@
           <input type="file" id="siblingInput" accept=".json,application/json" multiple hidden>
           <button type="button" class="btn" id="clearContext">Clear</button>
         </div>
-        <p class="hint">Nothing is uploaded anywhere — the files are read in your browser. The
-        manifest fills the variable and setting name lists and lets the tool warn about names your
-        game never declares. Other scene files let it check that a <code>jump</code> to another
-        scene actually goes somewhere.</p>
         <div class="chips" id="contextChips"></div>
       </fieldset>
 
@@ -92,17 +101,6 @@
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend>Edit an existing scene</legend>
-        <div class="btn-row">
-          <label class="btn" for="fileInput">Choose file…</label>
-          <input type="file" id="fileInput" accept=".json,application/json" hidden>
-          <button type="button" class="btn" id="resetBtn">Reset everything</button>
-        </div>
-        <div class="dropzone" id="dropZone">…or drop a <code>scene_NNNN.json</code> here</div>
-        <p class="hint">Commands and keys this generator does not model are kept exactly as they
-        were and written back out, so an unfamiliar file survives a round trip.</p>
-      </fieldset>
     </form>
 
     <!-- ========================= map + output ========================= -->
@@ -1268,7 +1266,7 @@
 
       } else if (last.cmd === "choice") {
         last.options.forEach(function (o, n) {
-          var tag = "“" + clip(o._mode === "key" ? "[" + o.text_key + "]" : o.text, 26) + "”";
+          var tag = "“" + clip(o._mode === "key" ? "[" + o.text_key + "]" : o.text, 70) + "”";
           var e = resolve(o._t, "choice", tag, b.i);
           if (e) b.out.push(e);
           else b.out.push({ to: next, kind: "choicefall", tag: tag + " falls through" });
@@ -1367,46 +1365,48 @@
          heading and its exit lines, so the body only lists what is between them */
       var first = b.from + (b.name ? 1 : 0);
       var last  = b.to - (cmds[b.to] && branches(cmds[b.to]) ? 1 : 0);
-      var lines = elt("p", "blk-lines");
+      /* Each line is its own block and gets its ellipsis from CSS, so the text
+         runs to whatever width the map column actually has instead of being cut
+         at a fixed character count. The cap below is only there to keep an
+         absurdly long line out of the DOM. */
+      var lines = elt("div", "blk-lines");
       var shown = 0;
       for (var i = first; i <= last && shown < 4; i++) {
         var c = cmds[i];
         if (!c) break;
         var spec = specFor(c.cmd);
-        var line = elt("span");
-        line.textContent = spec.title + "  " + clip(spec.summary(c), 46);
-        line.className = c.cmd === "say" ? "" : "muted";
+        var line = elt("div", "blk-line" + (c.cmd === "say" ? "" : " muted"));
+        line.textContent = spec.title + "  " + clip(spec.summary(c), 200);
+        line.title = line.textContent;
         lines.appendChild(line);
-        lines.appendChild(elt("br"));
         shown++;
       }
       var total = Math.max(0, last - first + 1);
-      if (total > shown) lines.appendChild(elt("span", "muted", "+ " + (total - shown) + " more"));
+      if (total > shown)
+        lines.appendChild(elt("div", "blk-line muted", "+ " + (total - shown) + " more"));
       if (lines.childNodes.length) box.appendChild(lines);
 
-      var exit = elt("p", "blk-exit");
+      var exit = elt("div", "blk-exit");
       b.out.forEach(function (e) {
-        var span = elt("span");
         var cls = e.kind === "jump" ? "e-jump" : e.kind === "cond" ? "e-cond"
                 : (e.kind === "choice" || e.kind === "choicefall") ? "e-choice" : "e-fall";
+        var text;
         if (e.missing) {
-          span.className = "e-stop";
-          span.textContent = "✗ no label “" + e.missing + "” in this scene";
+          cls = "e-stop";
+          text = "✗ no label “" + e.missing + "” in this scene";
         } else if (e.to === -1) {
-          span.className = "e-stop";
-          span.textContent = "✗ runs off the end of the scene";
+          cls = "e-stop";
+          text = "✗ runs off the end of the scene";
         } else if (e.ext) {
-          span.className = cls;
-          span.textContent = "→ " + e.name + (e.tag ? "  " + e.tag : "");
+          text = "→ " + e.name + (e.tag ? "  " + e.tag : "");
         } else if (e.to === b.i + 1) {
-          span.className = cls === "e-fall" ? "e-fall" : cls;
-          span.textContent = "↓ " + (e.tag || "continues");
+          text = "↓ " + (e.tag || "continues");
         } else {
-          span.className = cls;
-          span.textContent = "→ " + (e.name || "block " + e.to) + (e.tag ? "  " + e.tag : "");
+          text = "→ " + (e.name || "block " + e.to) + (e.tag ? "  " + e.tag : "");
         }
-        exit.appendChild(span);
-        exit.appendChild(elt("br"));
+        var line = elt("div", "blk-line " + cls, text);
+        line.title = text;
+        exit.appendChild(line);
       });
       box.appendChild(exit);
 

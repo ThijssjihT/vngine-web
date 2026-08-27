@@ -380,14 +380,19 @@ textarea:focus { outline: none; border-color: var(--accent-dim); }
 .cmd {
   background: var(--bg);
   border: 1px solid var(--line);
-  border-left-width: 3px;
+  /* a wide left edge, so picking a different command while everything is
+     collapsed is an easy target rather than a hunt for the header row */
+  border-left-width: 9px;
   border-radius: 4px;
   padding: .45rem .55rem .5rem;
 }
-.cmd.sel      { border-color: var(--accent-dim); }
+/* state classes come after the two flavour classes, so hovering and selecting
+   still read on a planned command */
 .cmd.planned  { border-left-color: var(--warn); }
 .cmd.unreach  { opacity: .5; }
-.cmd.bad      { border-left-color: #d05a5a; }
+.cmd:hover    { border-left-color: var(--accent-dim); }
+.cmd.sel      { border-color: var(--accent-dim); border-left-color: var(--accent); }
+.cmd.sel:hover { border-left-color: var(--accent); }
 
 .cmd-head { display: flex; align-items: center; gap: .4rem; }
 .cmd-n {
@@ -568,8 +573,15 @@ textarea:focus { outline: none; border-color: var(--accent-dim); }
   color: var(--warn);
 }
 .blk-lines { margin: .2rem 0 0; font-size: .78rem; color: var(--fg-dim); line-height: 1.5; }
-.blk-lines .muted { color: var(--fg-faint); }
-.blk-exit { margin: .25rem 0 0; font-size: .78rem; line-height: 1.5; }
+.blk-exit  { margin: .25rem 0 0; font-size: .78rem; line-height: 1.5; }
+/* one line per row, trimmed to the column's real width rather than a fixed
+   character count, so a wide map column is actually used */
+.blk-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.blk-line.muted { color: var(--fg-faint); }
 .blk-exit .e-jump   { color: var(--accent); }
 .blk-exit .e-cond   { color: var(--warn); }
 .blk-exit .e-choice { color: #8fd694; }
