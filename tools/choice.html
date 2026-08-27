@@ -16,43 +16,7 @@
   <code>qml/game/assets/ui/choice/&lt;name&gt;.json</code> and activate it from a scene with a
   <code>style</code> command, or from the manifest under <code>default_styles</code>.</p>
 
-  <div class="tool">
-    <!-- ============ preview ============ -->
-    <div class="tool-preview">
-      <div class="preview-head">
-        <label for="device">Preview on</label>
-        <select id="device"></select>
-        <label for="previewSize">Size</label>
-        <input type="range" id="previewSize" min="150" max="560" step="10" value="240">
-        <div class="custom-size" id="customSize" hidden>
-          <div class="row">
-            <input type="number" id="customW" min="120" value="1080"> ×
-            <input type="number" id="customH" min="120" value="2340">
-          </div>
-        </div>
-      </div>
-      <div class="preview-frame" id="frame">
-        <div class="preview-bg"></div>
-        <div class="preview-sprite"></div>
-        <div class="preview-textbox" id="previewBox">
-          <div class="preview-inner" id="previewInner">
-            <div class="preview-speaker">Liisa</div>
-            <div class="preview-text">People leave things for attention sometimes. Or to hide them
-            in plain sight.</div>
-          </div>
-        </div>
-        <div class="preview-choiceframe" id="choiceFrame">
-          <div class="preview-choicegrid" id="choiceGrid">
-            <div class="preview-option">Ask her about the tape</div>
-            <div class="preview-option">Pin the slip back and say nothing</div>
-            <div class="preview-option">Take it</div>
-          </div>
-        </div>
-        <div class="preview-warn" id="previewWarn" hidden></div>
-      </div>
-      <p class="preview-meta" id="previewMeta"></p>
-    </div>
-
+  <div class="tool roomy">
     <!-- ============ form ============ -->
     <form id="form" autocomplete="off" onsubmit="return false;">
 
@@ -278,8 +242,40 @@
       </fieldset>
     </form>
 
-    <!-- ============ output ============ -->
+    <!-- ============ preview + output ============ -->
     <div class="tool-side">
+      <div class="field" style="grid-template-columns: 6rem 1fr;">
+        <label for="device">Preview on</label>
+        <select id="device"></select>
+      </div>
+      <div class="custom-size" id="customSize" hidden>
+        <div class="row">
+          <input type="number" id="customW" min="120" value="1080"> ×
+          <input type="number" id="customH" min="120" value="2340">
+        </div>
+      </div>
+
+      <div class="preview-frame" id="frame">
+        <div class="preview-bg"></div>
+        <div class="preview-sprite"></div>
+        <div class="preview-textbox" id="previewBox">
+          <div class="preview-inner" id="previewInner">
+            <div class="preview-speaker">Liisa</div>
+            <div class="preview-text">People leave things for attention sometimes. Or to hide them
+            in plain sight.</div>
+          </div>
+        </div>
+        <div class="preview-choiceframe" id="choiceFrame">
+          <div class="preview-choicegrid" id="choiceGrid">
+            <div class="preview-option">Ask her about the tape</div>
+            <div class="preview-option">Pin the slip back and say nothing</div>
+            <div class="preview-option">Take it</div>
+          </div>
+        </div>
+        <div class="preview-warn" id="previewWarn" hidden></div>
+      </div>
+      <p class="preview-meta" id="previewMeta"></p>
+
       <div class="btn-row">
         <button type="button" class="btn primary" id="copyBtn">Copy JSON</button>
         <button type="button" class="btn" id="downloadBtn">Download</button>
@@ -337,7 +333,6 @@
   var optEls    = frame.querySelectorAll(".preview-option");
   var warnEl    = document.getElementById("previewWarn");
   var metaEl    = document.getElementById("previewMeta");
-  var sizeEl    = document.getElementById("previewSize");
   var matchStateEl = document.getElementById("matchState");
   var applyBtn  = document.getElementById("applyMatch");
   var themedChk = document.getElementById("textThemed");
@@ -437,7 +432,6 @@
     customBox.hidden = !window.DEVICE_PROFILES[deviceSel.value].custom;
     render();
   });
-  sizeEl.addEventListener("input", renderPreview);
   document.getElementById("customW").addEventListener("input", render);
   document.getElementById("customH").addEventListener("input", render);
 
@@ -707,14 +701,11 @@
     var shortSide = Math.min(p.width, p.height);
     frame.style.aspectRatio = longSide + " / " + shortSide;
 
-    /* cap the frame by the height the user asked for, expressed as a max-width
-       so the aspect ratio still drives the height */
-    var wantH = parseInt(sizeEl.value, 10) || 240;
-    frame.style.maxWidth = (wantH * longSide / shortSide) + "px";
-
     var frameW = frame.clientWidth;
     var frameH = frame.clientHeight || (frameW * shortSide / longSide);
-    if (!frameW) return;
+    /* the frame has no box yet on the very first paint — come back next frame
+       rather than drawing everything against a width of zero */
+    if (!frameW) { window.requestAnimationFrame(renderPreview); return; }
 
     var pixelRatio = shortSide / REF;
     var scale = (frameW / longSide) * pixelRatio;
@@ -810,7 +801,19 @@
     el.hidden = true;
   }
 
+  /* Any throw in here used to leave the preview silently unstyled, which reads as
+     "the preview is broken" with nothing to go on. Show the message instead. */
   function render() {
+    try {
+      renderInner();
+    } catch (err) {
+      warnEl.hidden = false;
+      warnEl.textContent = "Generator error: " + (err && err.message ? err.message : err);
+      if (window.console) console.error(err);
+    }
+  }
+
+  function renderInner() {
     pathHint.textContent = "assets/ui/choice/" + meta.styleId + ".json";
     borderWarning(gBorderWarn, state.grid.border, "grid frame");
     borderWarning(oBorderWarn, state.option.border, "option");
@@ -838,6 +841,7 @@
 
   binding.refresh();
   render();
+  window.addEventListener("load", render);
 })();
 </script>
 </body>
