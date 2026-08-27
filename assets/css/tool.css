@@ -211,3 +211,42 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 }
 
 .chain-link.cyclic { color: var(--warn); border: 1px solid rgba(255,180,84,.5); }
+
+/* --- hints directly inside a fieldset --- */
+
+fieldset > .hint { font-size: .8rem; color: var(--fg-faint); margin: .4rem 0 0; line-height: 1.5; }
+
+/* --- choice preview --- */
+
+.preview-choiceframe {
+  position: absolute;
+  box-sizing: border-box;
+  border-style: solid;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+.preview-choicegrid { display: grid; }
+.preview-option {
+  box-sizing: border-box;
+  border-style: solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+/* --- match-from-textbox panel --- */
+
+.match-state {
+  font-size: .82rem;
+  color: var(--fg-faint);
+  margin: .6rem 0 0;
+  line-height: 1.5;
+}
+.match-state.loaded { color: var(--fg-dim); }
+.match-state code { color: var(--accent); }
+.match-groups { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; margin: .7rem 0 .2rem; }
+.match-groups .check { font-size: .85rem; }
+.match-groups .lbl { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--fg-faint); width: 100%; margin-top: .4rem; }
