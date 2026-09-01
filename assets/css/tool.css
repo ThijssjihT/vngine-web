@@ -257,6 +257,10 @@ fieldset > .hint { font-size: .8rem; color: var(--fg-faint); margin: .4rem 0 0; 
 .match-groups { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; margin: .7rem 0 .2rem; }
 .match-groups .check { font-size: .85rem; }
 .match-groups .lbl { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--fg-faint); width: 100%; margin-top: .4rem; }
+.match-groups .check input:disabled + * , .match-groups .check input:disabled { cursor: not-allowed; }
+.match-groups .check:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+.group-state { color: var(--fg-faint); font-size: .78rem; }
+.applied-note { color: var(--accent); }
 
 /* --- roomier side column, for generators whose preview is landscape --- */
 

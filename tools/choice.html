@@ -54,15 +54,19 @@
         <div class="dropzone" id="matchDrop">…or drop a textbox <code>.json</code> here</div>
         <div class="match-groups">
           <span class="lbl">Copy</span>
-          <label class="check"><input type="checkbox" id="mBackground" checked> background</label>
-          <label class="check"><input type="checkbox" id="mBorder" checked> border and radius</label>
-          <label class="check"><input type="checkbox" id="mPadding"> padding</label>
+          <label class="check"><input type="checkbox" id="mBackground" checked> background<span class="group-state" id="sBackground"></span></label>
+          <label class="check"><input type="checkbox" id="mBorder" checked> border and radius<span class="group-state" id="sBorder"></span></label>
+          <label class="check"><input type="checkbox" id="mPadding"> padding<span class="group-state" id="sPadding"></span></label>
           <span class="lbl">Onto</span>
           <label class="check"><input type="checkbox" id="tOption" checked> each option</label>
           <label class="check"><input type="checkbox" id="tGrid"> the grid frame</label>
         </div>
         <p class="match-state" id="matchState">No textbox style loaded. The preview uses the engine
         defaults for the dialogue box behind the choices.</p>
+        <p class="hint">Only the values the textbox file actually sets are copied. A file exported
+        with <em>only changed values</em> ticked sets just a few keys, and everything it leaves out
+        stays as your parent style has it — the copy never writes an engine default over an
+        inherited value.</p>
         <p class="hint">This is a one-time copy into the form below, not a live link — the engine has
         no cross-category inheritance, so the values are written into your choice file as ordinary
         overrides and will not follow later edits to the textbox style. Copying the background onto
@@ -312,9 +316,11 @@
   var note     = "";
   var meta     = { styleId: "my_choice" };
 
-  var matchStyle = null;              // resolved textbox style, for matching and the backdrop
+  var matchStyle = null;              // resolved over the textbox defaults — draws the backdrop
+  var matchGiven = null;              // only what the file itself sets — this is what gets copied
   var matchName  = "";
   var matchBase  = null;              // a base we cannot resolve from one file
+  var matchNote  = "";                // what the last Apply did
 
   var form      = document.getElementById("form");
   var output    = document.getElementById("output");
@@ -572,9 +578,54 @@
     e.target.value = "";
   });
 
-  /* match a textbox style ------------------------------------------- */
+  /* match a textbox style -------------------------------------------
+     Two views of the loaded file are kept. matchStyle is resolved over the
+     textbox engine defaults and only ever draws the backdrop. matchGiven is
+     the file's own keys, and it is the one Apply copies from: a textbox file
+     exported with "only changed values" sets a handful of keys, and writing
+     the engine default for the rest would silently overwrite whatever the
+     parent choice style set — the preview would then look as if the parent
+     had been forgotten. Anything the textbox file does not set is left
+     alone, so it keeps inheriting from the parent. */
+
+  /* group -> the keys it copies, relative to the target (grid / option) */
+  var MATCH_GROUPS = [
+    { id: "background", chk: "mBackground", state: "sBackground", label: "background",
+      keys: ["background.color", "background.opacity"] },
+    { id: "border", chk: "mBorder", state: "sBorder", label: "border and radius",
+      keys: ["border.width", "border.color", "border.opacity", "radius"] },
+    { id: "padding", chk: "mPadding", state: "sPadding", label: "padding",
+      keys: ["padding.left", "padding.right", "padding.top", "padding.bottom"] }
+  ];
+
+  /* the keys of a group that the loaded file actually sets */
+  function givenKeys(group) {
+    if (!matchGiven) return [];
+    return group.keys.filter(function (k) { return T.get(matchGiven, k) !== undefined; });
+  }
+
+  function countGiven() {
+    var n = 0;
+    MATCH_GROUPS.forEach(function (g) { n += givenKeys(g).length; });
+    return n;
+  }
 
   function renderMatchState() {
+    MATCH_GROUPS.forEach(function (g) {
+      var el  = document.getElementById(g.state);
+      var chk = document.getElementById(g.chk);
+      if (!matchStyle) {
+        el.textContent = "";
+        chk.disabled = false;
+        return;
+      }
+      var n = givenKeys(g).length;
+      chk.disabled = n === 0;
+      el.textContent = n === 0 ? " — not set in this file"
+                     : n < g.keys.length ? " — " + n + " of " + g.keys.length + " values"
+                     : "";
+    });
+
     if (!matchStyle) {
       matchStateEl.className = "match-state";
       matchStateEl.textContent = "No textbox style loaded. The preview uses the engine defaults " +
@@ -583,14 +634,16 @@
       return;
     }
     matchStateEl.className = "match-state loaded";
-    var html = "Loaded <code>" + matchName + "</code>, resolved over the textbox engine defaults. " +
-      "It is drawn behind the choices in the preview.";
+    var html = "Loaded <code>" + matchName + "</code>. It is drawn behind the choices in the " +
+      "preview, resolved over the textbox engine defaults. Only the " + countGiven() +
+      " value(s) the file itself sets are copied; the rest keep coming from your parent style.";
     if (matchBase) {
       html += ' <span style="color:var(--warn)">This file inherits from <strong>' + matchBase +
-        "</strong>, which cannot be resolved here — anything the parent sets is showing as the " +
-        "engine default. Re-export it from the textbox generator with " +
-        "<em>only changed values</em> unticked to get a flat file.</span>";
+        "</strong>, which cannot be resolved here — anything only the parent sets is showing as " +
+        "the engine default behind the choices, and is not available to copy. Re-export it from " +
+        "the textbox generator with <em>only changed values</em> unticked to get a flat file.</span>";
     }
+    if (matchNote) html += ' <span class="applied-note">' + matchNote + "</span>";
     matchStateEl.innerHTML = html;
     applyBtn.disabled = false;
   }
@@ -606,8 +659,10 @@
       return;
     }
     matchStyle = T.mergeStyle(T.clone(TB_DEF), data.style);
+    matchGiven = T.clone(data.style);
     matchName  = idFromFilename(filename || "textbox style");
     matchBase  = typeof data.base === "string" ? data.base : null;
+    matchNote  = "";
     render();
   }
 
@@ -618,36 +673,46 @@
   });
 
   document.getElementById("clearMatch").addEventListener("click", function () {
-    matchStyle = null; matchName = ""; matchBase = null;
+    matchStyle = null; matchGiven = null; matchName = ""; matchBase = null; matchNote = "";
     render();
   });
 
   applyBtn.addEventListener("click", function () {
-    if (!matchStyle) return;
+    if (!matchGiven) return;
     var targets = [];
     if (document.getElementById("tOption").checked) targets.push("option");
     if (document.getElementById("tGrid").checked)   targets.push("grid");
     if (!targets.length) { alert("Pick at least one target to copy onto."); return; }
 
-    var wantBg      = document.getElementById("mBackground").checked;
-    var wantBorder  = document.getElementById("mBorder").checked;
-    var wantPadding = document.getElementById("mPadding").checked;
+    var copied = 0, groups = [], skipped = [];
 
-    targets.forEach(function (t) {
-      if (wantBg) {
-        T.set(state, t + ".background.color",   matchStyle.background.color);
-        T.set(state, t + ".background.opacity", matchStyle.background.opacity);
-      }
-      if (wantBorder) {
-        T.set(state, t + ".border.width",   matchStyle.border.width);
-        T.set(state, t + ".border.color",   matchStyle.border.color);
-        T.set(state, t + ".border.opacity", matchStyle.border.opacity);
-        T.set(state, t + ".radius",         matchStyle.radius);
-      }
-      if (wantPadding) {
-        T.set(state, t + ".padding", T.clone(matchStyle.padding));
-      }
+    MATCH_GROUPS.forEach(function (g) {
+      if (!document.getElementById(g.chk).checked) return;
+      var keys = givenKeys(g);
+      if (!keys.length) { skipped.push(g.label); return; }
+      keys.forEach(function (k) {
+        var v = T.get(matchGiven, k);
+        targets.forEach(function (t) { T.set(state, t + "." + k, T.clone(v)); });
+      });
+      copied += keys.length * targets.length;
+      groups.push(g.label + (keys.length < g.keys.length ? " (partly set)" : ""));
     });
+
+    if (!copied) {
+      alert("This textbox file does not set any of the values you ticked, so there is nothing " +
+            "to copy. Values it leaves out keep coming from your parent style — that is what " +
+            "you want in most cases. To copy everything, re-export the textbox style with " +
+            "“only changed values” unticked.");
+      matchNote = "";
+      render();
+      return;
+    }
+
+    matchNote = "Copied " + groups.join(", ") + " onto " + targets.join(" and ") + ".";
+    if (skipped.length) {
+      matchNote += " " + skipped.join(" and ") + ": not set in this file, so " +
+        (targets.length > 1 ? "they" : "it") + " still inherits from your parent style.";
+    }
 
     binding.refresh();
     render();
