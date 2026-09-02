@@ -618,6 +618,220 @@ textarea:focus { outline: none; border-color: var(--accent-dim); }
 .notice .goto:hover { color: var(--accent); border-color: var(--accent-dim); }
 .notice.err { color: #ff9b9b; border-color: #d05a5a; background: rgba(208,90,90,.08); }
 
+/* --- the view switch --- */
+
+.viewbar { display: flex; align-items: center; gap: .35rem; margin: 0 0 1.4rem; }
+.viewtab {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: .9rem;
+  padding: .35rem 1.1rem;
+}
+.viewtab:hover { border-color: var(--accent-dim); color: var(--accent); }
+.viewtab.sel { border-color: var(--accent-dim); background: var(--bg-elev-2); color: var(--accent); }
+.viewbar-note { font-size: .8rem; color: var(--fg-faint); margin-left: .6rem; }
+
+/* --- the read view --- */
+/* Full width and long: the prose wants room across and a run down the page,
+   which is the opposite of what the branch map's sticky column is shaped for. */
+
+.read-head { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; margin: 0 0 .3rem; max-width: 64rem; }
+.read-head h2 { font-size: 1rem; border: 0; margin: 0; padding: 0; }
+.read-head .note { font-size: .78rem; color: var(--fg-faint); flex: 1; }
+.read-head .check { font-size: .82rem; }
+.read > .hint { font-size: .82rem; color: var(--fg-faint); margin: 0 0 1.2rem; max-width: 54rem; line-height: 1.6; }
+
+.prose { max-width: 64rem; }
+.rd-empty { color: var(--fg-faint); font-style: italic; font-size: .9rem; }
+
+.rd-block { margin: 0 0 .1rem; }
+
+/* a label is a heading, because that is what it is to the reader: the name of
+   somewhere the story can arrive from elsewhere */
+.rd-head {
+  font-family: var(--mono);
+  font-size: .78rem;
+  color: var(--accent);
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  cursor: pointer;
+  margin: 1.5rem 0 .5rem;
+  padding: .1rem .2rem;
+  border-radius: 3px;
+}
+.rd-head:first-child { margin-top: 0; }
+.rd-head .n { color: var(--fg-faint); font-size: .7rem; }
+.rd-head:hover { background: var(--bg-elev); }
+.rd-head.sel { background: var(--bg-elev-2); }
+
+/* one paragraph is one speaker's run; the boundaries inside it are still
+   visible, because each one is a tap the player has to make */
+.rd-say {
+  border-left: 2px solid var(--line);
+  padding: .1rem 0 .1rem .9rem;
+  margin: .55rem 0;
+}
+.rd-say.narration { border-left-color: transparent; padding-left: 1.9rem; }
+/* not upper-cased: a speaker can be written as %her_name%, and the engine
+   matches that name letter for letter */
+.rd-who {
+  font-family: var(--mono);
+  font-size: .74rem;
+  letter-spacing: .06em;
+  color: var(--fg-faint);
+  margin: 0 0 .15rem;
+}
+
+.rd-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: .98rem;
+  line-height: 1.6;
+  color: var(--fg);
+  cursor: pointer;
+  padding: .2rem .3rem;
+  margin: 0 -.3rem;
+  border-radius: 3px;
+}
+/* the hairline is the command boundary — where one tap ends and the next begins */
+.rd-line + .rd-line { border-top: 1px solid var(--line); }
+.rd-line:hover { background: var(--bg-elev); }
+.rd-line.sel { background: var(--bg-elev-2); box-shadow: inset 2px 0 0 var(--accent); }
+.rd-say.narration .rd-line { color: var(--fg-dim); font-style: italic; }
+.rd-line.unresolved { color: var(--fg-faint); font-style: normal; }
+.rd-key { font-family: var(--mono); font-size: .85rem; color: var(--warn); }
+.rd-aside { font-size: .78rem; color: var(--fg-faint); margin-left: .5rem; }
+
+/* stage and logic commands, off by default */
+.rd-mark {
+  font-family: var(--mono);
+  font-size: .74rem;
+  color: var(--fg-faint);
+  line-height: 1.5;
+  cursor: pointer;
+  display: flex;
+  gap: .5rem;
+  padding: .18rem .3rem;
+  margin: .1rem -.3rem;
+  border-radius: 3px;
+}
+.rd-mark .k { color: var(--fg-dim); flex: none; min-width: 7rem; }
+.rd-mark:hover { background: var(--bg-elev); }
+.rd-mark.sel { background: var(--bg-elev-2); }
+.rd-mark.loud { color: var(--warn); }
+.rd-mark.loud .k { color: var(--warn); }
+.rd-line + .rd-mark { border-top: 1px solid var(--line); }
+
+/* --- forks --- */
+
+.rd-fork {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  padding: .6rem .75rem .75rem;
+  margin: 1rem 0;
+}
+.rd-fork-head {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  font-size: .78rem;
+  color: var(--fg-faint);
+  cursor: pointer;
+  padding: .1rem .2rem;
+  margin: 0 0 .4rem;
+  border-radius: 3px;
+}
+.rd-fork-head .k {
+  font-family: var(--mono);
+  color: #8fd694;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  font-size: .72rem;
+}
+.rd-fork.cond .rd-fork-head .k { color: var(--warn); }
+/* a choice inside a choice steps back down, so the nesting stays readable */
+.rd-fork .rd-fork { background: var(--bg); }
+.rd-fork-head:hover { background: var(--bg-elev-2); }
+.rd-fork-head.sel { background: var(--bg-elev-2); }
+
+.rd-arm { border-left: 2px solid #3a5f42; padding: 0 0 0 .9rem; margin: .55rem 0 0; }
+.rd-fork.cond .rd-arm { border-left-color: #6b5330; }
+.rd-arm-head {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  flex-wrap: wrap;
+  cursor: pointer;
+  padding: .2rem .3rem;
+  margin: 0 -.3rem .35rem;
+  border-radius: 3px;
+}
+.rd-arm-head:hover { background: var(--bg-elev-2); }
+.rd-arm-head.sel { background: var(--bg-elev-2); }
+.rd-arm-head .opt { font-size: .95rem; color: var(--fg); }
+.rd-arm-head .to { font-family: var(--mono); font-size: .74rem; color: var(--accent); }
+.rd-arm-head .to.stop { color: #d05a5a; }
+/* a marker, not the variable names: which state an option carries belongs on
+   the command, not in the middle of somebody's dialogue */
+.rd-arm-head .flag {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--fg-faint);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 .35rem;
+  cursor: help;
+}
+.rd-arm-head .flag.fx { color: var(--warn); border-color: rgba(255,180,84,.35); }
+.rd-arm-body { margin: 0; }
+.rd-arm-body > .rd-block:first-child > .rd-head:first-child { margin-top: 0; }
+
+/* --- where a branch goes --- */
+
+.rd-goto {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  flex-wrap: wrap;
+  font-family: var(--mono);
+  font-size: .78rem;
+  color: var(--accent);
+  cursor: pointer;
+  padding: .25rem .3rem;
+  margin: .5rem -.3rem 0;
+  border-radius: 3px;
+}
+.rd-goto:hover { background: var(--bg-elev); }
+.rd-goto.sel { background: var(--bg-elev-2); }
+.rd-goto .arr { flex: none; }
+.rd-goto .note { font-family: var(--sans); color: var(--fg-faint); font-size: .76rem; }
+.rd-goto.stop { color: #d05a5a; cursor: default; }
+
+/* --- what never runs --- */
+
+.rd-orphans {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: .2rem 1rem 1rem;
+  margin: 2.5rem 0 0;
+  opacity: .75;
+}
+.rd-orphans h3 { font-size: 1rem; color: var(--warn); margin: 1.1rem 0 .2rem; }
+.rd-orphan-note { font-size: .82rem; color: var(--fg-faint); margin: 0 0 .8rem; }
+
+@media (max-width: 700px) {
+  .rd-say.narration { padding-left: .9rem; }
+  .rd-mark { flex-direction: column; gap: 0; }
+  .rd-mark .k { min-width: 0; }
+}
+
 /* loaded-context chips */
 .chips { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 0; }
 .chip {

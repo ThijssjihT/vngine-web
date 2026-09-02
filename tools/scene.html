@@ -17,7 +17,15 @@
   right is the scene's branching: every label is a block, every jump and choice is an arrow, and
   anything unreachable or dead-ended is called out before you build the RPM.</p>
 
-  <div class="tool roomy">
+  <div class="viewbar" role="tablist" aria-label="View">
+    <button type="button" class="viewtab sel" id="tabEdit" role="tab" aria-selected="true"
+            aria-controls="editView">Edit</button>
+    <button type="button" class="viewtab" id="tabRead" role="tab" aria-selected="false"
+            aria-controls="readView">Read</button>
+    <span class="viewbar-note" id="viewNote">The form, the branch map and the JSON.</span>
+  </div>
+
+  <div class="tool roomy" id="editView">
     <!-- ============================= form ============================= -->
     <form id="form" autocomplete="off" onsubmit="return false;">
 
@@ -130,6 +138,23 @@
       </div>
       <pre class="json-out" id="output"></pre>
     </div>
+  </div>
+
+  <!-- ============================== read ============================= -->
+  <div class="read" id="readView" hidden>
+    <div class="read-head">
+      <h2>Read</h2>
+      <span class="note" id="readMeta"></span>
+      <label class="check">
+        <input type="checkbox" id="readTech"> show stage and logic commands
+      </label>
+    </div>
+    <p class="hint">The scene as it plays, not as it is filed: every branch is followed from the
+    start, so a label sits under the choice that reaches it rather than wherever it happens to be
+    in the command list. A line is one tap in the engine. Text is shown exactly as written —
+    <code>%name%</code> is left alone, because the tool has no idea what it will say. Click any
+    line to open it in the editor.</p>
+    <div class="prose" id="readProse"></div>
   </div>
 </div>
 
@@ -987,6 +1012,14 @@
   var sceneIdEl  = document.getElementById("sceneId");
   var pathHint   = document.getElementById("pathHint");
   var chipBox    = document.getElementById("contextChips");
+  var editView   = document.getElementById("editView");
+  var readView   = document.getElementById("readView");
+  var tabEdit    = document.getElementById("tabEdit");
+  var tabRead    = document.getElementById("tabRead");
+  var viewNote   = document.getElementById("viewNote");
+  var readProse  = document.getElementById("readProse");
+  var readMeta   = document.getElementById("readMeta");
+  var readTech   = document.getElementById("readTech");
   var rowEls     = [];
 
   /* ------------------------------------------------------------ list edits */
@@ -1106,6 +1139,9 @@
       var from = parseInt(b.getAttribute("data-from"), 10);
       var to   = parseInt(b.getAttribute("data-to"), 10);
       b.classList.toggle("sel", !isNaN(from) && selected >= from && selected <= to);
+    });
+    Array.prototype.forEach.call(readProse.querySelectorAll("[data-i]"), function (el) {
+      el.classList.toggle("sel", parseInt(el.getAttribute("data-i"), 10) === selected);
     });
   }
 
@@ -1857,6 +1893,356 @@
     return out.filter(function (s) { return str(s).indexOf("%") !== -1; });
   }
 
+  /* ------------------------------------------------------------ read view */
+  /*
+     Prose for proofreading. It walks the block graph from block 0 rather than
+     reading `cmds` top to bottom, because physical order is not narrative
+     order: a label is a jump target, not a continuation of the lines above it,
+     and the commands after a choice are their own block that only fall-through
+     reaches.
+
+     renderProse() takes its container and its options as arguments and reads no
+     page state beyond `cmds`, so the planned "read one playthrough" mode and the
+     standalone export can call it with a container of their own.
+  */
+
+  /* Commands with no writing in them, hidden until asked for. Everything else
+     that is not a say — `end`, and any command this generator has no editor
+     for — always shows: a command the tool cannot read for you is exactly the
+     thing a reader should be told about rather than quietly shown nothing. */
+  var QUIET = { set: 1, style: 1, show_hud: 1, bg: 1, sprite: 1, sprite_remove: 1,
+                wait: 1, audio_bg: 1, audio_sfx: 1, audio_voice: 1 };
+
+  /* every block reachable from n, n itself included. Externals are not blocks
+     and drop out here, which is what makes them dead ends for the walk. */
+  function reachFrom(g, n, cache) {
+    if (cache[n]) return cache[n];
+    var seen = bag(), queue = [n];
+    seen[n] = true;
+    while (queue.length) {
+      var b = g.blocks[queue.shift()];
+      if (!b) continue;
+      b.out.forEach(function (e) {
+        if (e.to < 0 || e.to >= g.blocks.length || seen[e.to]) return;
+        seen[e.to] = true;
+        queue.push(e.to);
+      });
+    }
+    cache[n] = seen;
+    return seen;
+  }
+
+  function blockLabel(g, n) {
+    var b = g.blocks[n];
+    if (!b) return "block " + n;
+    return b.name || ("#" + b.from + (b.to > b.from ? "–" + b.to : ""));
+  }
+
+  function renderProse(g, host, opts) {
+    opts = opts || {};
+    var ctx = { g: g, done: bag(), cache: bag(),
+                quiet: !!opts.showQuiet, pick: opts.onPick || function () {} };
+
+    host.innerHTML = "";
+    if (!cmds.length) {
+      host.appendChild(elt("p", "rd-empty", "Nothing to read yet."));
+      return;
+    }
+    if (g.blocks.length) emitRun(ctx, 0, bag(), host);
+
+    /* whatever the walk never arrived at goes last, said plainly rather than
+       quietly dropped: unreachable blocks, and any island left over */
+    var left = [];
+    g.blocks.forEach(function (b) { if (!ctx.done[b.i]) left.push(b.i); });
+    if (!left.length) return;
+    var sec = elt("div", "rd-orphans");
+    sec.appendChild(elt("h3", null, "Never reached from the start"));
+    sec.appendChild(elt("p", "rd-orphan-note", "Nothing in the scene arrives at these, so none " +
+      "of it plays. They are listed in file order, each walked on its own."));
+    left.forEach(function (n) { if (!ctx.done[n]) emitRun(ctx, n, bag(), sec); });
+    host.appendChild(sec);
+  }
+
+  /* One straight run: this block, then wherever its single exit goes, until it
+     forks, ends, or arrives somewhere already placed. `stop` holds the blocks an
+     enclosing fork has claimed as its join — arriving at one ends the run with a
+     pointer instead of rendering it a second time inside the branch. */
+  function emitRun(ctx, n, stop, host) {
+    for (;;) {
+      if (n < 0 || n >= ctx.g.blocks.length) return;
+      if (stop[n] || ctx.done[n]) { host.appendChild(goesTo(ctx, n, !!ctx.done[n])); return; }
+      ctx.done[n] = true;
+
+      var b = ctx.g.blocks[n];
+      emitBlock(ctx, b, host);
+
+      var outs = b.out || [];
+      if (!outs.length) return;
+      if (outs.length > 1) { emitFork(ctx, b, outs, stop, host); return; }
+
+      var e = outs[0];
+      if (e.ext || e.to < 0 || e.to >= ctx.g.blocks.length) {
+        host.appendChild(edgeEnd(ctx, e));
+        return;
+      }
+      n = e.to;      /* a jump or a fall-through is a continuation — keep reading */
+    }
+  }
+
+  /* The lines of one block. The label at the top is the heading and the branch
+     at the bottom is drawn by the walker, so neither is repeated here. */
+  function emitBlock(ctx, b, host) {
+    var wrap = elt("div", "rd-block");
+    var head = headingFor(ctx, b);
+    if (head) wrap.appendChild(head);
+
+    var para = null, who = null;
+
+    for (var i = b.from; i <= b.to; i++) {
+      var c = cmds[i];
+      if (!c) break;
+      if (c.cmd === "label" && i === b.from) continue;
+      /* the walker draws the branch at the foot of a block, so it is not
+         repeated here. `end` is the one branching command with nothing to
+         draw and something to say, so it stays as a marker. */
+      if (branches(c) && c.cmd !== "end") continue;
+
+      if (c.cmd === "say") {
+        var k = str(c.speaker).trim();
+        if (!para || k !== who) {
+          who = k;
+          para = elt("div", "rd-say" + (k ? "" : " narration"));
+          if (k) para.appendChild(elt("div", "rd-who", k));
+          wrap.appendChild(para);
+        }
+        para.appendChild(sayLine(ctx, c, i));
+        continue;
+      }
+
+      /* a marker goes inside the open paragraph, so switching the markers on
+         does not split a speaker's run in two */
+      var mark = markLine(ctx, c, i);
+      if (!mark) continue;
+      if (para) para.appendChild(mark); else wrap.appendChild(mark);
+    }
+
+    if (wrap.childNodes.length) host.appendChild(wrap);
+  }
+
+  function headingFor(ctx, b) {
+    var labelled = !!(cmds[b.from] && cmds[b.from].cmd === "label");
+    if (!labelled && b.i !== 0) return null;
+    var h = elt("div", "rd-head");
+    h.setAttribute("data-i", b.from);
+    h.appendChild(elt("span", "nm", b.name || (labelled ? "(unnamed label)" : "scene start")));
+    h.appendChild(elt("span", "n", "#" + b.from + (b.to > b.from ? "–" + b.to : "")));
+    h.title = "#" + b.from + " — open in the editor";
+    h.addEventListener("click", function () { ctx.pick(b.from); });
+    return h;
+  }
+
+  /* One say is one tap in the engine, so every one of them is its own line even
+     when the speaker does not change. The text goes in as written — %name% is
+     left alone, and so is the author's own spacing and line breaking. */
+  function sayLine(ctx, c, i) {
+    var line = elt("div", "rd-line");
+    line.setAttribute("data-i", i);
+    if (c._mode === "key") {
+      line.className = "rd-line unresolved";
+      line.appendChild(elt("span", "rd-key", "[" + (str(c.text_key).trim() || "no text key") + "]"));
+      line.appendChild(elt("span", "rd-aside", "text_key — nothing here can resolve it"));
+    } else if (!str(c.text).trim()) {
+      line.className = "rd-line unresolved";
+      line.appendChild(elt("span", "rd-aside", "an empty line of dialogue"));
+    } else {
+      line.textContent = c.text;
+    }
+    line.title = "#" + i + " — open in the editor";
+    line.addEventListener("click", function () { ctx.pick(i); });
+    return line;
+  }
+
+  function markLine(ctx, c, i) {
+    if (!ctx.quiet && QUIET[c.cmd]) return null;
+    var spec = specFor(c.cmd);
+    var m = elt("div", "rd-mark" + (QUIET[c.cmd] ? "" : " loud"));
+    m.setAttribute("data-i", i);
+    m.appendChild(elt("span", "k", spec.title));
+    m.appendChild(elt("span", null, clip(spec.summary(c), 160)));
+    m.title = "#" + i + " — open in the editor";
+    m.addEventListener("click", function () { ctx.pick(i); });
+    return m;
+  }
+
+  /* A fork is a choice or a jump_if. Its branches are rendered under it, and a
+     block more than one of them can get to is their join: it is rendered once,
+     below the whole fork, and each branch ends with a pointer at it. */
+  function emitFork(ctx, b, outs, stop, host) {
+    var last = cmds[b.to];
+    var isChoice = !!(last && last.cmd === "choice");
+    var options = isChoice && last.options.length === outs.length ? last.options : null;
+
+    var hits = bag();
+    outs.forEach(function (e) {
+      if (e.to < 0 || e.to >= ctx.g.blocks.length) return;
+      var s = reachFrom(ctx.g, e.to, ctx.cache);
+      Object.keys(s).forEach(function (k) { hits[k] = (hits[k] || 0) + 1; });
+    });
+    var joins = [];
+    Object.keys(hits).forEach(function (k) {
+      var n = Number(k);
+      if (hits[k] > 1 && !stop[n] && !ctx.done[n]) joins.push(n);
+    });
+    /* when one join leads to another, the one that leads comes first, so the
+       second is reached as its continuation instead of standing on its own */
+    joins.sort(function (x, y) {
+      var xy = reachFrom(ctx.g, y, ctx.cache)[x] ? 1 : 0;
+      var yx = reachFrom(ctx.g, x, ctx.cache)[y] ? 1 : 0;
+      return xy !== yx ? xy - yx : x - y;
+    });
+
+    var inner = bag();
+    Object.keys(stop).forEach(function (k) { inner[k] = true; });
+    joins.forEach(function (n) { inner[n] = true; });
+
+    var box = elt("div", "rd-fork" + (isChoice ? "" : " cond"));
+    var fh = elt("div", "rd-fork-head");
+    fh.setAttribute("data-i", b.to);
+    fh.appendChild(elt("span", "k", isChoice ? "choice" : last ? last.cmd : "branch"));
+    fh.appendChild(elt("span", null, isChoice
+      ? outs.length + (outs.length === 1 ? " option" : " options") + ", the player picks one"
+      : "the scene splits on a condition"));
+    fh.title = "#" + b.to + " — open in the editor";
+    fh.addEventListener("click", function () { ctx.pick(b.to); });
+    box.appendChild(fh);
+
+    outs.forEach(function (e, n) {
+      var arm = elt("div", "rd-arm");
+      arm.appendChild(armHead(ctx, e, options ? options[n] : null, b.to));
+      var body = elt("div", "rd-arm-body");
+      if (!e.ext && e.to >= 0 && e.to < ctx.g.blocks.length) emitRun(ctx, e.to, inner, body);
+      else body.appendChild(edgeEnd(ctx, e));
+      arm.appendChild(body);
+      box.appendChild(arm);
+    });
+    host.appendChild(box);
+
+    joins.forEach(function (n) { if (!ctx.done[n]) emitRun(ctx, n, stop, host); });
+  }
+
+  function armHead(ctx, e, opt, at) {
+    var h = elt("div", "rd-arm-head");
+    h.setAttribute("data-i", at);
+    if (opt) {
+      var txt = opt._mode === "key"
+        ? "[" + (str(opt.text_key).trim() || "no text key") + "]"
+        : (str(opt.text).trim() || "(an option with no text)");
+      h.appendChild(elt("span", "opt", "“" + txt + "”"));
+      /* the marker says an option carries state, and stops there — spelling the
+         variables out in the middle of the prose is the map's job, not this */
+      if (opt.condition && str(opt.condition.name).trim()) {
+        var cf = elt("span", "flag", "conditional");
+        cf.title = "shown only when " + condText(opt.condition);
+        h.appendChild(cf);
+      }
+      if (opt.effects && opt.effects.length) {
+        var ef = elt("span", "flag fx", "changes state");
+        ef.title = opt.effects.length +
+          (opt.effects.length === 1 ? " variable changes" : " variables change") + " when this is picked";
+        h.appendChild(ef);
+      }
+    } else {
+      h.appendChild(elt("span", "opt", e.tag || "otherwise"));
+    }
+    h.appendChild(whereTo(ctx, e));
+    h.title = "#" + at + " — open in the editor";
+    h.addEventListener("click", function () { ctx.pick(at); });
+    return h;
+  }
+
+  function whereTo(ctx, e) {
+    var s = elt("span", "to");
+    if (e.missing) { s.className = "to stop"; s.textContent = "✗ no label “" + e.missing + "”"; }
+    else if (e.ext) { s.textContent = "→ " + e.name + ", another scene"; }
+    else if (e.to < 0 || e.to >= ctx.g.blocks.length) { s.className = "to stop"; s.textContent = "✗ off the end"; }
+    else if (e.kind === "choicefall") { s.textContent = "↓ falls through to " + blockLabel(ctx.g, e.to); }
+    else { s.textContent = "→ " + blockLabel(ctx.g, e.to); }
+    return s;
+  }
+
+  /* The branch stops here and the reader is sent on: either back to something
+     already read, or down to the join the sibling branches share. */
+  function goesTo(ctx, n, already) {
+    var at = ctx.g.blocks[n] ? ctx.g.blocks[n].from : 0;
+    var p = elt("div", "rd-goto");
+    p.setAttribute("data-i", at);
+    p.appendChild(elt("span", "arr", "→"));
+    p.appendChild(elt("span", "nm", blockLabel(ctx.g, n)));
+    p.appendChild(elt("span", "note",
+      already ? "read that again from above" : "where the branches join, below"));
+    p.title = "#" + at + " — open in the editor";
+    p.addEventListener("click", function () { ctx.pick(at); });
+    return p;
+  }
+
+  function edgeEnd(ctx, e) {
+    var p = elt("div", "rd-goto" + (e.ext ? "" : " stop"));
+    if (e.missing) {
+      p.appendChild(elt("span", "arr", "✗"));
+      p.appendChild(elt("span", "nm", e.missing));
+      p.appendChild(elt("span", "note", "no label of that name in this scene — the engine warns and reads on"));
+    } else if (e.ext) {
+      p.appendChild(elt("span", "arr", "→"));
+      p.appendChild(elt("span", "nm", e.name));
+      p.appendChild(elt("span", "note", "another scene, so the reading stops here"));
+    } else {
+      p.appendChild(elt("span", "arr", "✗"));
+      p.appendChild(elt("span", "nm", "off the end of the scene"));
+      p.appendChild(elt("span", "note", "nothing follows, and the engine drops the player out of the game screen"));
+    }
+    return p;
+  }
+
+  /* --- the pane and the switch ------------------------------------------ */
+
+  var VIEW_NOTE = {
+    edit: "The form, the branch map and the JSON.",
+    read: "The writing on its own, every branch walked from the start."
+  };
+
+  /* Both panes stay in the document. Hiding one keeps the caret, the selection
+     and the scroll position of the other for the trip back. */
+  function setView(name) {
+    var read = name === "read";
+    editView.hidden = read;
+    readView.hidden = !read;
+    tabEdit.classList.toggle("sel", !read);
+    tabRead.classList.toggle("sel", read);
+    tabEdit.setAttribute("aria-selected", read ? "false" : "true");
+    tabRead.setAttribute("aria-selected", read ? "true" : "false");
+    viewNote.textContent = read ? VIEW_NOTE.read : VIEW_NOTE.edit;
+    /* drawArcs measures laid-out elements, and a hidden map measures zero, so
+       the way back to Edit has to draw the arcs again */
+    render();
+  }
+
+  function renderRead(g) {
+    if (readView.hidden) return;        /* setView() renders on the way in */
+    renderProse(g, readProse, {
+      showQuiet: readTech.checked,
+      onPick: function (i) { setView("edit"); focusCommand(i); }
+    });
+    var lines = 0, choices = 0, unreached = 0;
+    cmds.forEach(function (c) {
+      if (c.cmd === "say") lines++;
+      if (c.cmd === "choice") choices++;
+    });
+    g.blocks.forEach(function (b) { if (!b.reach) unreached++; });
+    readMeta.textContent = lines + (lines === 1 ? " line" : " lines") + " · " +
+      choices + (choices === 1 ? " choice" : " choices") +
+      (unreached ? " · " + unreached + (unreached === 1 ? " block" : " blocks") + " never reached" : "");
+  }
+
   /* ------------------------------------------------------------- datalists */
 
   function fillList(id, values) {
@@ -1937,6 +2323,7 @@
     output.textContent = formatScene();
     renderMap(g);
     checkNotices(g);
+    renderRead(g);
     markSelection();
 
     /* the arcs need the laid-out heights */
@@ -1946,6 +2333,9 @@
   var lastGraph = null;
   function drawArcsAgain(g) {
     lastGraph = g;
+    /* a hidden map has no geometry — every block measures zero and the arcs
+       come out collapsed, so leave them alone until Edit is on screen again */
+    if (editView.hidden) return;
     var els = [];
     Array.prototype.forEach.call(mapBlocks.children, function (el, i) { els[i] = el; });
     if (els.length) { mapArcs.innerHTML = ""; drawArcs(g, els); }
@@ -2229,6 +2619,10 @@
     compact = e.target.checked;
     markSelection();
   });
+
+  tabEdit.addEventListener("click", function () { setView("edit"); });
+  tabRead.addEventListener("click", function () { setView("read"); });
+  readTech.addEventListener("change", function () { render(); });
 
   T.wireLoaders({
     fileInput: document.getElementById("fileInput"),
