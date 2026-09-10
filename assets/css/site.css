@@ -73,6 +73,13 @@
   --page-max: var(--shell);
 }
 
+/* Dark by default, following the ambience token values in :root above.
+   A light ambience follows the visitor's OS/browser preference; explicit
+   [data-ambience="light"|"dark"] on <html> overrides it either way (e.g.
+   for a future manual theme toggle). Every token gets a light-tuned value
+   here, including --warn — that one was missing before, which is why the
+   TODO badges' orange (tuned for a near-black canvas) looked wrong once a
+   light canvas was introduced. */
 @media (prefers-color-scheme: light) {
   :root:not([data-ambience="dark"]) {
     --canvas:        oklch(0.96 0.010 var(--amb-h));
@@ -88,6 +95,7 @@
     --highlight:     oklch(0.50 0.100 var(--amb-h));
     --highlight-up:  oklch(0.38 0.100 var(--amb-h));
     --highlight-mark:oklch(0.50 0.100 var(--amb-h) / 0.45);
+    --warn:          oklch(0.50 0.150 55);
 
     --ink:           oklch(0.22 0.030 var(--amb-h));
     --ink-2:         oklch(0.34 0.035 var(--amb-h) / 0.92);
@@ -113,6 +121,7 @@
   --highlight:     oklch(0.50 0.100 var(--amb-h));
   --highlight-up:  oklch(0.38 0.100 var(--amb-h));
   --highlight-mark:oklch(0.50 0.100 var(--amb-h) / 0.45);
+  --warn:          oklch(0.50 0.150 55);
 
   --ink:           oklch(0.22 0.030 var(--amb-h));
   --ink-2:         oklch(0.34 0.035 var(--amb-h) / 0.92);
