@@ -414,10 +414,82 @@ td code { white-space: nowrap; }
 }
 .hero .media figcaption { max-width: none; }
 
-.media-wide {
-  margin: clamp(32px, 5vw, 56px) 0 0;
+/* a mosaic of screenshot placeholders that tiles into one (near-)rectangle,
+   puzzle-piece style, instead of a loose wrapped row. Two 16:9 tiles stack
+   in the left column; two 9:16 tiles fill the right two columns at full
+   height. With columns at 8fr/5fr/5fr and two equal rows, each cell's own
+   aspect ratio already lands within ~1% of its content's native ratio when
+   the whole mosaic is held at 2:1 — so nothing has to stretch or letterbox
+   to fit. Captions live as a bottom-anchored overlay (the "footer text")
+   baked into each tile, so the tile — image plus caption — stays a clean
+   rectangle and the mosaic packs edge to edge. */
+.mosaic {
+  display: grid;
+  grid-template-columns: 8fr 5fr 5fr;
+  grid-template-rows: 1fr 1fr;
+  aspect-ratio: 2 / 1;
+  gap: clamp(10px, 1.4vw, 16px);
+  margin: clamp(28px, 4vw, 44px) 0 0;
 }
-.media-wide figcaption { max-width: 60ch; }
+.mosaic-item {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ink-faint);
+  border-radius: 18px;
+  background: repeating-linear-gradient(135deg, var(--ink-faint) 0 7px, transparent 7px 14px);
+}
+.mosaic-item:nth-child(1) { grid-column: 1; grid-row: 1; }
+.mosaic-item:nth-child(2) { grid-column: 1; grid-row: 2; }
+.mosaic-item:nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
+.mosaic-item:nth-child(4) { grid-column: 3; grid-row: 1 / span 2; }
+
+/* a real <img> dropped in later should cover its tile the same way */
+.mosaic-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.mosaic-tag {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+/* caption as a bottom overlay, not page prose: a fixed dark scrim + light
+   text, same convention as the game banner cards, because once these are
+   real screenshots their brightness won't follow the site's light/dark
+   theme — the scrim has to stay legible either way. */
+.mosaic-item figcaption {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  margin: 0;
+  padding: 28px 14px 12px;
+  background: linear-gradient(180deg, transparent, oklch(0.14 0.02 250 / 0.55) 45%, oklch(0.14 0.02 250 / 0.9));
+  color: oklch(0.97 0.01 250);
+  font-size: 12.5px;
+  line-height: 1.5;
+  max-width: none;
+}
+
+@media (max-width: 700px) {
+  .mosaic {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: none;
+    aspect-ratio: auto;
+    gap: 14px;
+  }
+  .mosaic-item:nth-child(1), .mosaic-item:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    aspect-ratio: 16 / 9;
+  }
+  .mosaic-item:nth-child(3), .mosaic-item:nth-child(4) {
+    grid-column: span 1;
+    grid-row: auto;
+    aspect-ratio: 9 / 16;
+  }
+}
 
 /* placeholder: a stand-in image box, diagonal hazard-stripe fill, rounded
    corners, a small mono label pinned to the bottom-left corner. Swap the
