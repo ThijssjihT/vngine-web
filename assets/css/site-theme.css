@@ -1,0 +1,536 @@
+/* VNgine site theme — "Ambience"
+   Sailfish-influenced, not a Silica copy. Dark blue ambience by default;
+   a light ambience follows the OS preference, and [data-ambience="light"|"dark"]
+   on <html> overrides it.
+
+   Swapping the hue: every colour below derives from --amb-h (hue) and the four
+   --amb-* stops. Change those five values and the whole site re-tints.
+
+   Class names follow the structure in the repo README (site-header, cards,
+   wiki-tree, tool output). Where yours differ, the element selectors still
+   carry most of the look. */
+
+:root {
+  --amb-h: 210;                              /* ambience hue — change me */
+
+  --canvas:        oklch(0.18 0.035 var(--amb-h));
+  --amb-top:       oklch(0.40 0.085 var(--amb-h) / 0.85);
+  --amb-mid:       oklch(0.16 0.040 var(--amb-h) / 0.62);
+  --amb-deep:      oklch(0.12 0.030 var(--amb-h) / 0.90);
+  --amb-foot:      oklch(0.33 0.070 var(--amb-h) / 0.75);
+  --amb-glow-a:    oklch(0.55 0.110 var(--amb-h) / 0.34);
+  --amb-glow-b:    oklch(0.45 0.120 calc(var(--amb-h) + 30) / 0.22);
+  --amb-glow-c:    oklch(0.70 0.070 var(--amb-h) / 0.16);
+  --texture:       oklch(1 0 0 / 0.055);     /* 3px dot grain */
+
+  --highlight:     oklch(0.80 0.075 var(--amb-h));       /* #8ec6ee-ish  */
+  --highlight-up:  oklch(0.90 0.050 var(--amb-h));       /* hover        */
+  --highlight-mark:oklch(0.80 0.075 var(--amb-h) / 0.45);/* chevron ring */
+
+  --ink:           oklch(1 0 0 / 0.95);
+  --ink-2:         oklch(0.89 0.035 var(--amb-h) / 0.82); /* tinted body  */
+  --ink-3:         oklch(0.89 0.035 var(--amb-h) / 0.72); /* mono meta    */
+  --ink-faint:     oklch(0.89 0.035 var(--amb-h) / 0.28); /* marks only   */
+  --surface:       oklch(1 0 0 / 0.055);                  /* output block */
+
+  --font: "Open Sans", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --shell:  1180px;
+  --gutter: clamp(20px, 5vw, 64px);
+  --measure: 40ch;
+
+  /* one step larger and lighter than a typical web scale */
+  --step-page:    clamp(38px, 7vw, 96px);   /* page header    */
+  --step-section: clamp(20px, 2.4vw, 28px); /* section label  */
+  --step-entry:   clamp(22px, 2.6vw, 29px); /* entry title    */
+  --step-lede:    clamp(16px, 1.7vw, 20px);
+  --step-body:    15px;
+  --step-meta:    11px;
+
+  --gap-section: clamp(56px, 9vw, 104px);
+  --gap-block:   clamp(32px, 5vw, 72px);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-ambience="dark"]) {
+    --canvas:        oklch(0.96 0.010 var(--amb-h));
+    --amb-top:       oklch(0.88 0.045 var(--amb-h) / 0.85);
+    --amb-mid:       oklch(0.97 0.012 var(--amb-h) / 0.60);
+    --amb-deep:      oklch(0.99 0.006 var(--amb-h) / 0.85);
+    --amb-foot:      oklch(0.90 0.040 var(--amb-h) / 0.70);
+    --amb-glow-a:    oklch(0.80 0.070 var(--amb-h) / 0.30);
+    --amb-glow-b:    oklch(0.82 0.060 calc(var(--amb-h) + 30) / 0.20);
+    --amb-glow-c:    oklch(0.90 0.050 var(--amb-h) / 0.18);
+    --texture:       oklch(0 0 0 / 0.040);
+
+    --highlight:     oklch(0.50 0.100 var(--amb-h));
+    --highlight-up:  oklch(0.38 0.100 var(--amb-h));
+    --highlight-mark:oklch(0.50 0.100 var(--amb-h) / 0.45);
+
+    --ink:           oklch(0.22 0.030 var(--amb-h));
+    --ink-2:         oklch(0.34 0.035 var(--amb-h) / 0.92);
+    --ink-3:         oklch(0.40 0.035 var(--amb-h) / 0.90);
+    --ink-faint:     oklch(0.40 0.035 var(--amb-h) / 0.30);
+    --surface:       oklch(0 0 0 / 0.040);
+  }
+}
+
+:root[data-ambience="light"] {
+  --canvas:        oklch(0.96 0.010 var(--amb-h));
+  --amb-top:       oklch(0.88 0.045 var(--amb-h) / 0.85);
+  --amb-mid:       oklch(0.97 0.012 var(--amb-h) / 0.60);
+  --amb-deep:      oklch(0.99 0.006 var(--amb-h) / 0.85);
+  --amb-foot:      oklch(0.90 0.040 var(--amb-h) / 0.70);
+  --amb-glow-a:    oklch(0.80 0.070 var(--amb-h) / 0.30);
+  --amb-glow-b:    oklch(0.82 0.060 calc(var(--amb-h) + 30) / 0.20);
+  --amb-glow-c:    oklch(0.90 0.050 var(--amb-h) / 0.18);
+  --texture:       oklch(0 0 0 / 0.040);
+
+  --highlight:     oklch(0.50 0.100 var(--amb-h));
+  --highlight-up:  oklch(0.38 0.100 var(--amb-h));
+  --highlight-mark:oklch(0.50 0.100 var(--amb-h) / 0.45);
+
+  --ink:           oklch(0.22 0.030 var(--amb-h));
+  --ink-2:         oklch(0.34 0.035 var(--amb-h) / 0.92);
+  --ink-3:         oklch(0.40 0.035 var(--amb-h) / 0.90);
+  --ink-faint:     oklch(0.40 0.035 var(--amb-h) / 0.30);
+  --surface:       oklch(0 0 0 / 0.040);
+}
+
+/* ---------------- base ---------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 300 17px/1.7 var(--font);
+  text-wrap: pretty;
+  position: relative;
+}
+
+/* the ambience: gradient wash + two glows + dot grain, all fixed */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+body::before {
+  background:
+    radial-gradient(1200px 620px at 88% -8%, var(--amb-glow-a), transparent 60%),
+    radial-gradient(900px 700px at -6% 34%, var(--amb-glow-b), transparent 62%),
+    radial-gradient(900px 520px at 50% 112%, var(--amb-glow-c), transparent 66%),
+    linear-gradient(180deg, var(--amb-top) 0%, var(--amb-mid) 26%, var(--amb-deep) 58%, var(--amb-foot) 100%);
+}
+body::after {
+  opacity: 0.5;
+  background-image: radial-gradient(var(--texture) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+}
+
+a { color: var(--highlight); text-decoration: none; transition: color 0.15s var(--ease); }
+a:hover, a:focus-visible { color: var(--highlight-up); }
+:focus-visible { outline: 1px solid var(--highlight); outline-offset: 4px; }
+::selection { background: var(--highlight); color: var(--canvas); }
+
+img, svg, video { max-width: 100%; height: auto; display: block; }
+
+/* no dividers anywhere: space separates. keep hr out of the vocabulary. */
+hr { display: none; }
+
+.shell, main, .page, .site-header, .site-footer {
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+section { padding-block: 0 var(--gap-section); }
+
+/* ---------------- type ---------------- */
+
+h1, h2, h3, h4 { margin: 0; font-weight: 300; }
+
+/* page header: right-aligned, light, large */
+h1 {
+  font-size: var(--step-page);
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  text-align: right;
+}
+h1 + p, .lede {
+  margin: 20px 0 0 auto;
+  max-width: 38ch;
+  font-size: var(--step-lede);
+  color: var(--ink-2);
+  text-align: right;
+}
+
+/* section label: right-aligned, sentence case, highlight — NOT an uppercase overline */
+h2, .section-label {
+  font-size: var(--step-section);
+  color: var(--highlight);
+  text-align: right;
+  margin-bottom: clamp(30px, 4vw, 52px);
+}
+h2 { margin-top: 0; }
+
+h3 { font-size: 19px; font-weight: 600; }
+h4 { font-size: 16px; font-weight: 600; }
+
+p, li { font-size: var(--step-body); line-height: 1.75; color: var(--ink-2); }
+p { max-width: 68ch; margin: 11px 0 0; }
+strong { color: var(--ink); font-weight: 600; }
+
+code, pre, kbd, samp, .mono, .meta { font-family: var(--mono); }
+.meta { font-size: var(--step-meta); color: var(--ink-3); }
+code { font-size: 0.92em; color: var(--highlight); }
+pre {
+  margin: 18px 0 0;
+  padding: 24px 22px;
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--ink);
+  overflow: auto;
+}
+pre code { color: inherit; }
+pre .key, pre .k { color: var(--highlight); }
+
+blockquote {
+  margin: 22px 0 0;
+  padding-left: 20px;
+  border-left: 2px solid var(--highlight-mark);
+  color: var(--ink-2);
+}
+
+/* ---------------- navigation ---------------- */
+
+/* centred, tab-bar style, highlight underline on the current page */
+.site-header {
+  display: flex;
+  justify-content: center;
+  gap: clamp(26px, 5vw, 58px);
+  align-items: baseline;
+  padding-block: clamp(26px, 4vw, 44px) clamp(30px, 5vw, 52px);
+}
+.site-header a {
+  font-size: clamp(19px, 2.2vw, 25px);
+  font-weight: 300;
+  color: var(--ink);
+  padding-bottom: 9px;
+  border-bottom: 2px solid transparent;
+}
+.site-header a:hover { color: var(--highlight-up); }
+.site-header a[aria-current], .site-header a.active {
+  color: var(--highlight);
+  border-bottom-color: var(--highlight);
+}
+
+/* page-stack depth, mono, right-aligned above the header */
+.breadcrumb {
+  font-family: var(--mono);
+  font-size: var(--step-meta);
+  color: var(--ink-3);
+  text-align: right;
+  margin-bottom: 14px;
+}
+.breadcrumb a { color: inherit; }
+.breadcrumb a:hover { color: var(--highlight); }
+
+/* the only affordance mark: a circled chevron after the label, at the right */
+.chevron, .more::after {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--highlight-mark);
+  color: var(--highlight);
+  font-size: 16px;
+  line-height: 1;
+  padding-bottom: 2px;
+}
+.more::after { content: "›"; }
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-bottom: clamp(30px, 4vw, 52px);
+}
+.section-head .section-label, .section-head h2 { margin: 0; }
+
+/* ---------------- entry lists (no cards) ---------------- */
+
+.cards, .card-list, .entries {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  column-gap: clamp(36px, 6vw, 90px);
+  row-gap: clamp(34px, 5vw, 52px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card, .entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 20px;
+  align-items: baseline;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+}
+.card .n, .entry .n { font-family: var(--mono); font-size: 12px; color: var(--highlight); }
+.card h3, .card .card-title, .entry-title {
+  font-size: var(--step-entry);
+  font-weight: 300;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.card p, .entry p { margin-top: 9px; max-width: var(--measure); }
+.card:hover .card-title, .card:hover h3, .entry:hover .entry-title { color: var(--highlight); }
+
+/* status pairs — label above a tinted state, no rows, no dots */
+.status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  column-gap: clamp(36px, 6vw, 90px);
+  row-gap: 26px;
+}
+.status .label { font-size: 18px; color: var(--ink); }
+.status .state { margin-top: 5px; font-size: 14px; color: var(--ink-2); }
+.status .state-done { color: var(--highlight); }
+.status .state-planned { color: var(--ink-3); }
+
+/* ---------------- wiki ---------------- */
+
+.wiki-layout, .with-sidebar {
+  display: grid;
+  grid-template-columns: minmax(190px, 232px) minmax(0, 1fr);
+  gap: clamp(34px, 5vw, 80px);
+  align-items: start;
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+@media (max-width: 780px) {
+  .wiki-layout, .with-sidebar { grid-template-columns: minmax(0, 1fr); }
+  .wiki-tree, .sidebar { position: static !important; }
+}
+
+.wiki-tree, .sidebar { position: sticky; top: 26px; }
+.wiki-tree ul, .sidebar ul { list-style: none; margin: 0; padding: 0; }
+.wiki-tree li ul, .sidebar li ul { margin-left: 14px; padding-left: 0; }
+.wiki-tree a, .sidebar a {
+  display: block;
+  padding: 7px 0;
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.wiki-tree a:hover, .sidebar a:hover { color: var(--highlight); }
+.wiki-tree a[aria-current], .wiki-tree a.active, .sidebar a.active {
+  color: var(--highlight);
+}
+.wiki-tree .group-label, .sidebar .group-label {
+  font-size: 15px;
+  color: var(--highlight);
+  padding: 22px 0 6px;
+}
+
+/* article prose: measure-bound, generously spaced, no boxes */
+.article > * + * { margin-top: 22px; }
+.article h2 { margin-top: clamp(44px, 6vw, 72px); }
+.article h3 { margin-top: clamp(30px, 4vw, 44px); }
+.article p, .article li { max-width: 68ch; font-size: 16px; }
+.article ol, .article ul { padding-left: 20px; }
+.article li + li { margin-top: 8px; }
+.article .note {
+  margin-top: 22px;
+  padding-left: 20px;
+  border-left: 2px solid var(--highlight-mark);
+  color: var(--ink-2);
+}
+
+/* ---------------- generators ---------------- */
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+  gap: clamp(34px, 5vw, 80px);
+  align-items: start;
+}
+.fields { display: grid; row-gap: clamp(26px, 3vw, 36px); }
+
+/* a field is a mono key, a large light value, and a state word. No boxes. */
+.field { display: block; }
+.field .key {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--step-meta);
+  color: var(--ink-3);
+}
+.field .row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+}
+.field input[type="text"],
+.field input[type="number"],
+.field select {
+  width: 5em;
+  background: none;
+  border: 0;
+  padding: 0;
+  outline: none;
+  font: 300 30px/1.2 var(--font);
+  color: var(--ink);
+}
+.field textarea {
+  width: 100%;
+  background: none;
+  border: 0;
+  outline: none;
+  resize: vertical;
+  font: 300 19px/1.6 var(--font);
+  color: var(--ink);
+}
+.field .unit { font-size: 15px; color: var(--ink-2); }
+.field .state { margin-left: auto; font-size: 13px; color: var(--ink-3); }
+
+/* the diff cue: a changed value is highlight-coloured and says so */
+.field.changed input, .field.changed textarea, .field.changed select { color: var(--highlight); }
+.field.changed .state { color: var(--highlight); }
+
+/* range: 2px track, round knob, value in highlight */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 2px;
+  background: var(--ink-faint);
+  border-radius: 1px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--highlight);
+  border: 0;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--highlight);
+}
+
+/* choice set: words with a highlight underline on the active one, not chips */
+.choices { display: flex; gap: clamp(20px, 4vw, 34px); margin-top: 12px; font-size: 22px; font-weight: 300; }
+.choices > * { color: var(--ink); cursor: pointer; padding-bottom: 4px; border-bottom: 2px solid transparent; }
+.choices > .on { color: var(--highlight); border-bottom-color: var(--highlight); }
+
+/* output — the one real surface on the site */
+.output-col { position: sticky; top: 26px; }
+.output-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.output, .json-output {
+  margin: 18px 0 0;
+  padding: 24px 22px;
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--ink);
+  white-space: pre;
+  overflow: auto;
+}
+.output-actions {
+  display: flex;
+  gap: clamp(18px, 3vw, 30px);
+  justify-content: flex-end;
+  margin-top: 22px;
+  font-size: 16px;
+}
+.output-actions a, .output-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 300 16px/1 var(--font);
+  color: var(--ink);
+  cursor: pointer;
+}
+.output-actions a:first-child, .output-actions button:first-child { color: var(--highlight); }
+.output-actions a::after, .output-actions button::after {
+  content: "›";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-faint);
+  font-size: 14px;
+  padding-bottom: 2px;
+}
+.output-actions a:first-child::after, .output-actions button:first-child::after {
+  border-color: var(--highlight-mark);
+}
+
+/* ---------------- placeholders & footer ---------------- */
+
+.placeholder {
+  aspect-ratio: 9 / 16;
+  max-width: 250px;
+  width: 100%;
+  border: 1px solid var(--ink-faint);
+  border-radius: 18px;
+  background: repeating-linear-gradient(135deg, oklch(1 0 0 / 0.07) 0 7px, transparent 7px 14px);
+  display: flex;
+  align-items: flex-end;
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: var(--step-meta);
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: clamp(48px, 8vw, 96px);
+  padding-bottom: clamp(40px, 6vw, 64px);
+  font-family: var(--mono);
+  font-size: var(--step-meta);
+  color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
