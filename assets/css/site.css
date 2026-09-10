@@ -185,7 +185,7 @@ h1, h2, h3, h4 { margin: 0 0 0.6em; font-weight: 300; letter-spacing: -0.01em; }
 /* page header: right-aligned, light, large — the .page hero gets the full
    right-aligned treatment; inside the narrower wiki column it reads better
    left-aligned, still large and light. */
-.page > h1 {
+.page > h1, .hero-text h1 {
   font-size: var(--step-page);
   line-height: 1.02;
   letter-spacing: -0.015em;
@@ -199,7 +199,7 @@ h1, h2, h3, h4 { margin: 0 0 0.6em; font-weight: 300; letter-spacing: -0.01em; }
   text-align: left;
   margin: 0;
 }
-.page > h1 + p.lede {
+.page > h1 + p.lede, .hero-text h1 + p.lede {
   margin: 20px 0 0 auto;
   max-width: 62ch;
   font-size: var(--step-lede);
@@ -389,6 +389,54 @@ td code { white-space: nowrap; }
 .layout main h2 { text-align: left; margin-top: clamp(44px, 6vw, 72px); }
 .layout main h3 { margin-top: clamp(30px, 4vw, 44px); }
 .layout main > * + * { margin-top: 22px; }
+
+/* ---------------- home page: hero media & placeholders ---------------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 300px);
+  gap: clamp(28px, 6vw, 64px);
+  align-items: start;
+}
+.hero-text { min-width: 0; }
+@media (max-width: 720px) {
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .hero .media { max-width: 240px; margin-inline: auto; }
+}
+
+.media { margin: 0; }
+.media figcaption {
+  margin-top: 12px;
+  max-width: var(--measure);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+.hero .media figcaption { max-width: none; }
+
+.media-wide {
+  margin: clamp(32px, 5vw, 56px) 0 0;
+}
+.media-wide figcaption { max-width: 60ch; }
+
+/* placeholder: a stand-in image box, diagonal hazard-stripe fill, rounded
+   corners, a small mono label pinned to the bottom-left corner. Swap the
+   div for a real <img> when there's something to show. */
+.placeholder {
+  width: 100%;
+  border: 1px solid var(--ink-faint);
+  border-radius: 18px;
+  background: repeating-linear-gradient(135deg, var(--ink-faint) 0 7px, transparent 7px 14px);
+  display: flex;
+  align-items: flex-end;
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: var(--step-meta);
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+.placeholder-portrait { aspect-ratio: 9 / 16; max-width: 280px; }
+.placeholder-landscape { aspect-ratio: 16 / 9; }
 
 /* ---------------- entry cards (built by assets/js/cards.js) ---------------- */
 
