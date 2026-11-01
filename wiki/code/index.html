@@ -12,9 +12,131 @@
   <aside class="sidebar" data-wiki-tree></aside>
   <main>
     <h1>Code walkthrough</h1>
-    <p class="lede">How the engine is put together, part by part.</p>
+    <p class="lede">How the engine is put together, for anyone who wants to read, fix or extend it.
+    The pages follow the engine's subsystems rather than its files, because most subsystems run
+    through several files.</p>
+
+    <p>Everything here describes the engine as of commit
+    <a href="https://github.com/ThijssjihT/VNgine/commit/a080df2"><code>a080df2</code></a>
+    (1 November 2026). All engine code lives under <code>qml/engine/</code>; the game itself lives
+    under <code>qml/game/</code> and is covered in <a href="../authoring/index.html">Game authoring</a>.</p>
+
+    <h2>The shape of it</h2>
+    <p>The engine is plain QML and ES5.1 JavaScript on Qt 5.6, with no C++ of its own. It falls
+    into five layers:</p>
+    <ul>
+      <li><strong><code>GameEngine.js</code></strong> holds the story state and the rules: the
+      loaded scene, the command pointer, labels, variables, conditions, style merging and sprite
+      file validation. It is a <code>.pragma library</code> script, so there is one shared copy and
+      it cannot see or create QML objects. Anything it needs from the QML side is handed in at
+      start-up.</li>
+      <li><strong><code>GameScreen.qml</code></strong> is the conductor. Its
+      <code>processNext()</code> takes the next command from the engine and routes it — to the
+      engine, to a component, or to a singleton — until a command needs the player. It also owns
+      the session: starting, resuming and resetting a game.</li>
+      <li><strong>Components</strong> draw what they are told: the textbox, the choice overlay,
+      the sprite layer, and the typewriter that reveals text. They keep no story state.</li>
+      <li><strong>Singletons</strong> — <code>AudioController</code>, <code>Settings</code> and
+      <code>SaveManager</code> — exist once for the whole app, outside any page, so every page
+      can reach them.</li>
+      <li><strong>Pages</strong> are the Silica screens around the game: title, settings, load
+      and save. <code>GameScreen</code> is a page too, and it never leaves the bottom of the page
+      stack.</li>
+    </ul>
+
+    <h2>Pages in this walkthrough</h2>
+    <p>Read them in this order the first time: they follow a game from start-up to a running scene,
+    then the subsystems a scene calls on, and end with saving, which touches all of them.</p>
     <div data-cards-children="wiki/code/index.html"></div>
-    <div class="todo"><strong>TODO</strong> — write the walkthrough pages.</div>
+
+    <h2>File map</h2>
+    <p>Where each file is explained. Paths are relative to <code>qml/engine/</code>, apart from the
+    entry point.</p>
+    <table class="files">
+      <tr><th>File</th><th>What it does</th><th>Explained in</th></tr>
+      <tr><td><code>qml/<wbr>harbour-vngine.qml</code></td>
+          <td>Two-line entry point that creates the application window.</td>
+          <td><a href="startup.html">Start-up and pages</a></td></tr>
+      <tr><td><code>components/<wbr>VNgineApplicationWindow.qml</code></td>
+          <td>Boot order: manifest, engine defaults path, settings, saves. Puts
+          <code>GameScreen</code> at the root of the page stack, starts or resumes a game behind
+          it, then pushes the title page on top.</td>
+          <td><a href="startup.html">Start-up and pages</a></td></tr>
+      <tr><td><code>pages/<wbr>TitlePage.qml</code></td>
+          <td>Banner, title, tagline and credits from the manifest; first-run gesture hints.</td>
+          <td><a href="startup.html">Start-up and pages</a></td></tr>
+      <tr><td><code>cover/<wbr>CoverPage.qml</code></td>
+          <td>The app cover. A placeholder for now.</td>
+          <td><a href="startup.html">Start-up and pages</a></td></tr>
+      <tr><td><code>GameEngine.js</code></td>
+          <td>Story state, JSON loading, scenes and labels, variables and conditions, style
+          merging, sprite file validation.</td>
+          <td><a href="command-loop.html">Command loop</a>,
+          <a href="variables.html">Variables</a>,
+          <a href="sprites.html">Sprites</a>,
+          <a href="style-resolution.html">Style resolution</a></td></tr>
+      <tr><td><code>pages/<wbr>GameScreen.qml</code></td>
+          <td>The command dispatcher, choices, session start/resume/reset, the pulley menu,
+          tap input, and assembling the layers. Also builds and restores the save blob.</td>
+          <td><a href="command-loop.html">Command loop</a>,
+          <a href="save-system.html">Save system</a></td></tr>
+      <tr><td><code>components/<wbr>Typewriter.qml</code></td>
+          <td>Reveals dialogue one character at a time; a tap skips to the full line.</td>
+          <td><a href="screen-layers.html">Screen layers</a></td></tr>
+      <tr><td><code>components/<wbr>TextboxLayer.qml</code></td>
+          <td>The dialogue box, laid out from the resolved textbox style.</td>
+          <td><a href="screen-layers.html">Screen layers</a></td></tr>
+      <tr><td><code>components/<wbr>ChoiceOverlay.qml</code></td>
+          <td>The choice grid and its options, laid out from the resolved choice style.</td>
+          <td><a href="screen-layers.html">Screen layers</a></td></tr>
+      <tr><td><code>components/<wbr>SpriteLayer.qml</code></td>
+          <td>The on-screen sprite list, one image per asset, one timer per animation.</td>
+          <td><a href="sprites.html">Sprites and animation</a></td></tr>
+      <tr><td><code>engine_defaults/<wbr>default_*.json</code></td>
+          <td>One complete style per category. The bottom layer of every style, and the
+          de facto schema.</td>
+          <td><a href="style-resolution.html">Style resolution</a></td></tr>
+      <tr><td><code>components/<wbr>AudioController.qml</code></td>
+          <td>Singleton. Music queue on two players for crossfades, a pool of one-shot effects,
+          a pool of named looping effects.</td>
+          <td><a href="audio.html">Audio</a></td></tr>
+      <tr><td><code>components/<wbr>SfxSlot.qml</code></td>
+          <td>One one-shot effect player in the pool.</td>
+          <td><a href="audio.html">Audio</a></td></tr>
+      <tr><td><code>components/<wbr>LoopFXSlot.qml</code></td>
+          <td>One looping effect player with its own fade.</td>
+          <td><a href="audio.html">Audio</a></td></tr>
+      <tr><td><code>components/<wbr>Settings.qml</code></td>
+          <td>Singleton. Builds the settings from the manifest and keeps them in LocalStorage.</td>
+          <td><a href="settings.html">Settings</a></td></tr>
+      <tr><td><code>pages/<wbr>SettingsPage.qml</code></td>
+          <td>The settings screen, generated from what <code>Settings</code> holds.</td>
+          <td><a href="settings.html">Settings</a></td></tr>
+      <tr><td><code>components/<wbr>SaveManager.qml</code></td>
+          <td>Singleton. The saves and flags tables, plus the staged save and staged load.</td>
+          <td><a href="save-system.html">Save system</a></td></tr>
+      <tr><td><code>pages/<wbr>SaveGamePage.qml</code></td>
+          <td>Pick a slot to save to.</td>
+          <td><a href="save-system.html">Save system</a></td></tr>
+      <tr><td><code>pages/<wbr>LoadGamePage.qml</code></td>
+          <td>Pick a save to load; rename and delete.</td>
+          <td><a href="save-system.html">Save system</a></td></tr>
+      <tr><td><code>components/<wbr>Constants.js</code></td>
+          <td>Database name and size, shared by <code>Settings</code> and
+          <code>SaveManager</code>; save thumbnail size.</td>
+          <td><a href="save-system.html">Save system</a></td></tr>
+      <tr><td><code>components/<wbr>qmldir</code></td>
+          <td>Registers the three singletons.</td>
+          <td><a href="architecture.html">Architecture overview</a></td></tr>
+    </table>
+
+    <h2>Not in the engine yet</h2>
+    <p>Worth knowing before you go looking for them: there is no HUD layer (a
+    <code>hud</code> style is resolved and saved, but nothing draws it), no <code>wait</code>,
+    <code>end</code>, <code>show_hud</code> or voice commands, and no <code>text_key</code> lookup —
+    a keyed line shows as <code>[key]</code>. Unknown commands are logged and skipped.</p>
+
+    <div class="todo"><strong>TODO</strong> — the pages above are outlined but not yet written.</div>
   </main>
 </div>
 <script src="../../assets/js/sitemap.js"></script>

@@ -560,6 +560,21 @@ td code { white-space: nowrap; }
 }
 .todo strong { color: var(--warn); }
 
+/* A table whose first column holds long file paths (code walkthrough file map).
+   Paths may wrap at the <wbr> after each slash, and nowhere else, instead of the
+   site-wide nowrap on td code. Below 700px each row stacks into a block, so three columns
+   never have to share a phone's width. */
+table.files td:first-child code { white-space: normal; }
+@media (max-width: 700px) {
+  table.files, table.files tbody, table.files tr, table.files td { display: block; width: auto; }
+  table.files tr:first-child { display: none; }
+  table.files tr { border: 1px solid var(--line); border-bottom: 0; padding: 0.6rem 0.7rem; }
+  table.files tr:last-child { border-bottom: 1px solid var(--line); }
+  table.files td { border: 0; padding: 0.15rem 0; }
+  table.files td:last-child { font-size: 0.88rem; }
+  table.files td:last-child::before { content: "Explained in: "; color: var(--ink-3); }
+}
+
 .pager {
   display: flex;
   justify-content: space-between;

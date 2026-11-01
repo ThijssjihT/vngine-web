@@ -41,13 +41,31 @@ window.SITE_MAP = {
     },
     {
       title: "Code walkthrough", path: "wiki/code/index.html",
+      /* Cut by subsystem, not by file: GameEngine.js and GameScreen.qml each serve several
+         subsystems, and most subsystems span several files. The file map on
+         wiki/code/index.html says which page covers which file.
+         status: "to be written" shows on the index cards until a page has content. */
       children: [
-        { title: "Architecture overview", path: "wiki/code/architecture.html" },
-        { title: "GameEngine.js", path: "wiki/code/game-engine.html" },
-        { title: "GameScreen.qml", path: "wiki/code/game-screen.html" },
-        { title: "Style resolution", path: "wiki/code/style-resolution.html" },
-        { title: "Save system", path: "wiki/code/save-system.html" },
-        { title: "Settings", path: "wiki/code/settings.html" }
+        { title: "Architecture overview", path: "wiki/code/architecture.html", status: "to be written",
+          blurb: "The layers, who may call whom, the bridges across .pragma library, and the house rules." },
+        { title: "Start-up and pages", path: "wiki/code/startup.html", status: "to be written",
+          blurb: "Boot order, why GameScreen sits at the bottom of the page stack, and the title page." },
+        { title: "The command loop", path: "wiki/code/command-loop.html", status: "to be written",
+          blurb: "processNext(), labels and jumps, choices, tap handling, and starting or resetting a session." },
+        { title: "Variables, conditions and text", path: "wiki/code/variables.html", status: "to be written",
+          blurb: "set and effects, condition evaluation, %name% interpolation, and the namespace shared with settings." },
+        { title: "Screen layers", path: "wiki/code/screen-layers.html", status: "to be written",
+          blurb: "Background, textbox and choice overlay, the typewriter, and scaling by Theme.pixelRatio." },
+        { title: "Sprites and animation", path: "wiki/code/sprites.html", status: "to be written",
+          blurb: "From a sprite command to images on screen: the validation pipeline and one timer per animation." },
+        { title: "Style resolution", path: "wiki/code/style-resolution.html", status: "to be written",
+          blurb: "Engine defaults, base chains and the deep merge, and how a resolved style reaches the QML." },
+        { title: "Audio", path: "wiki/code/audio.html", status: "to be written",
+          blurb: "The AudioController singleton: a two-player music queue, the effect pool and the named loop pool." },
+        { title: "Settings", path: "wiki/code/settings.html", status: "to be written",
+          blurb: "Manifest-driven settings, the flat key scheme, LocalStorage, and the settings page." },
+        { title: "Save system", path: "wiki/code/save-system.html", status: "to be written",
+          blurb: "Stage a save, pick a slot, commit it. The screen blob, thumbnails, and putting a scene back together on load." }
       ]
     },
     {
