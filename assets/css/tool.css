@@ -617,6 +617,11 @@ textarea:focus { outline: none; border-color: var(--accent-dim); }
 }
 .notice .goto:hover { color: var(--accent); border-color: var(--accent-dim); }
 .notice.err { color: #ff9b9b; border-color: #d05a5a; background: rgba(208,90,90,.08); }
+/* #ff9b9b is tuned for the dark canvas; on the light one it is barely readable. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-ambience="dark"]) .notice.err { color: #a3261e; }
+}
+:root[data-ambience="light"] .notice.err { color: #a3261e; }
 
 /* --- the view switch --- */
 
@@ -844,3 +849,169 @@ textarea:focus { outline: none; border-color: var(--accent-dim); }
   color: var(--fg-dim);
 }
 .chip.on { border-color: var(--accent-dim); color: var(--accent); }
+
+/* --- sprite object editor (tools/sprite-object.html) --- */
+
+.so-libstate { font-size: .85rem; color: var(--fg-dim); margin: .2rem 0 .6rem; }
+.so-libstate code { color: var(--accent); }
+
+.so-layer-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, .8fr) 4rem auto; }
+.so-count { font-family: var(--mono); font-size: .85rem; color: var(--fg-faint); padding: .4rem 0; }
+
+.so-asset-row {
+  grid-template-columns: 2.6rem minmax(0, 1fr) minmax(0, .8fr) minmax(0, 2fr) auto;
+  align-items: end;
+}
+.so-thumb {
+  width: 2.6rem; height: 3.4rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--warn);
+  font-family: var(--mono);
+  background-color: #8a8f9a;
+  background-image:
+    linear-gradient(45deg, #6d727c 25%, transparent 25%, transparent 75%, #6d727c 75%),
+    linear-gradient(45deg, #6d727c 25%, transparent 25%, transparent 75%, #6d727c 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 4px 4px;
+  overflow: hidden;
+}
+.so-thumb:empty { background: var(--bg-elev); }
+.so-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.so-thumb.approx { border-style: dashed; border-color: var(--warn); }
+
+.so-rowtools { display: flex; gap: .1rem; flex: none; align-self: end; padding-bottom: .15rem; }
+.so-rowtools button {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--fg-faint);
+  cursor: pointer;
+  font-size: .85rem;
+  line-height: 1;
+  padding: .35rem .4rem;
+  font-family: var(--mono);
+}
+.so-rowtools button:hover { color: var(--accent); border-color: var(--accent-dim); }
+.so-rowtools button.danger:hover { color: var(--warn); border-color: color-mix(in oklch, var(--warn) 40%, transparent); }
+
+.so-anim {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-dim);
+  border-radius: 4px;
+  padding: .6rem .65rem .2rem;
+  margin: .6rem 0;
+}
+.so-anim-head { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; gap: .5rem; align-items: end; }
+.so-anim-head .cell, .so-step .cell { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.so-anim-head .cell > span, .so-step .cell > span {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--fg-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.so-anim-sum { font-size: .8rem; color: var(--fg-dim); margin: .4rem 0 .3rem; min-height: 1em; }
+.so-steps { display: flex; flex-direction: column; gap: .3rem; }
+.so-step {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: .45rem;
+  align-items: end;
+  border-top: 1px solid var(--line);
+  padding-top: .35rem;
+  transition: background-color .3s;
+}
+.so-step input, .so-step select { font-size: .88rem; padding: .3rem .4rem; }
+.so-step.flash { background: color-mix(in oklch, var(--accent) 14%, transparent); }
+.so-step-n { font-family: var(--mono); font-size: .72rem; color: var(--fg-faint); text-align: right; padding-bottom: .5rem; }
+.so-anim .btn-row { margin: .5rem 0; }
+
+/* preview controls */
+.so-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .5rem; margin: 0 0 .7rem; }
+.so-controls .row input { width: 100%; min-width: 0; }
+
+.so-frame { aspect-ratio: 16 / 9; }
+.so-stage { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.so-bg-black { background: #000; }
+.so-bg-white { background: #fff; }
+.so-bg-image { background-color: #000; }
+.so-bg-checker {
+  background-color: #9a9ea8;
+  background-image:
+    linear-gradient(45deg, #7c808a 25%, transparent 25%, transparent 75%, #7c808a 75%),
+    linear-gradient(45deg, #7c808a 25%, transparent 25%, transparent 75%, #7c808a 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
+/* The sprite: 90 % of the screen's height, aspect-ratio set from the first asset.
+   No clipping — a QML Item does not clip its children either. */
+.so-sprite { position: absolute; height: 90%; width: auto; }
+.so-sprite.bounds { outline: 1px dashed var(--accent); outline-offset: -1px; }
+.so-img { position: absolute; left: 0; top: 0; height: 100%; width: auto; max-width: none; display: block; }
+.so-ph {
+  position: absolute; left: 0; top: 0; height: 100%; aspect-ratio: .5;
+  border: 1px dashed rgba(255,255,255,.55);
+  background: rgba(255,255,255,.08);
+}
+.so-ph span {
+  position: absolute; left: 6px;
+  font-family: var(--mono); font-size: .72rem;
+  color: #fff; background: rgba(0,0,0,.55);
+  padding: .05rem .3rem; border-radius: 2px;
+  white-space: nowrap;
+}
+.so-refused {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: .85rem; line-height: 1.6;
+  color: #ff9b9b; background: rgba(10,12,18,.72);
+}
+
+.so-playrow select { width: auto; font-size: .85rem; padding: .3rem .4rem; }
+.so-clock { margin-left: auto; font-family: var(--mono); font-size: .8rem; color: var(--fg-faint); }
+
+.so-timelines { display: flex; flex-direction: column; gap: .45rem; }
+.so-tl-label { display: flex; gap: .6rem; align-items: baseline; font-size: .78rem; margin-bottom: .15rem; }
+.so-tl-name { font-family: var(--mono); color: var(--fg-dim); }
+.so-tl-type { color: var(--fg-faint); font-size: .7rem; text-transform: uppercase; letter-spacing: .09em; }
+.so-tl-bar { display: flex; height: 1.7rem; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.so-tl-step {
+  position: relative;
+  min-width: .6rem;
+  border-right: 1px solid var(--line);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex; align-items: center;
+}
+.so-tl-step:last-child { border-right: 0; }
+.so-tl-step span {
+  position: relative;
+  font-family: var(--mono); font-size: .68rem; color: var(--fg-faint);
+  padding: 0 .3rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.so-tl-step.hold { background: var(--bg-elev); justify-content: center; }
+.so-tl-step.on span { color: var(--fg); }
+.so-tl-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: color-mix(in oklch, var(--accent) 28%, transparent); }
+.so-tl-step:hover { background: var(--bg-elev-2); }
+
+.so-h3 { font-size: 1rem; margin: 1.6rem 0 .6rem; color: var(--fg-dim); font-weight: 500; }
+.so-snippet { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 700px) {
+  .so-asset-row { grid-template-columns: 2.6rem minmax(0, 1fr) minmax(0, 1fr) auto; }
+  .so-asset-row .so-a-file { grid-column: 2 / -1; grid-row: 2; }
+  .so-step { grid-template-columns: 1.4rem minmax(0, 1fr) minmax(0, 1fr); }
+  .so-step > .cell:nth-child(2) { grid-column: 2 / -1; }
+  .so-step > .cell:nth-child(3) { grid-column: 2; }
+  .so-step > .cell:nth-child(4) { grid-column: 3; }
+  .so-step .so-rowtools { grid-column: 2 / -1; justify-self: end; }
+  .so-anim-head { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .so-anim-head .so-rowtools { grid-column: 1 / -1; justify-self: end; }
+}

@@ -69,8 +69,8 @@ window.SITE_MAP = {
       blurb: "Definitions for the in-game settings page." },
     { title: "Scene script",      path: "tools/scene.html",     status: "ready",
       blurb: "Build a scene command list without hand-writing JSON, with a branch map that shows every jump, choice, dead end and unreachable stretch." },
-    { title: "Sprite animation object", path: "tools/sprite-object.html", status: "planned",
-      blurb: "Composite sprites and animation objects." }
+    { title: "Sprite object", path: "tools/sprite-object.html", status: "ready",
+      blurb: "Layered and animated sprites: stack images in layers, animate them in loops or one-shots, and watch it play with your own images." }
   ],
 
   /* One entry per game; add a sub page under games/ for each. */

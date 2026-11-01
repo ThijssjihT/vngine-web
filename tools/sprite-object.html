@@ -3,17 +3,1641 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sprite animation object — VNgine</title>
+<title>Sprite object editor — VNgine</title>
 <link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/tool.css">
 <script>window.SITE_BASE = "../";</script>
 </head>
 <body>
-<div class="page">
-  <h1>Sprite animation object</h1>
-    <div class="todo"><strong>TODO</strong> — this page has not been written yet.</div>
+<div class="page wide">
+  <p class="breadcrumb"><a href="index.html">Tools</a> / Sprite object</p>
+  <h1>Sprite object editor</h1>
+  <p class="lede">Builds a sprite object: a <code>.json</code> file that stacks several images in
+  layers and animates them, such as a character who blinks. Save it under
+  <code>qml/game/assets/sprites/</code> and name it in a scene's <code>sprite</code> command
+  instead of a <code>.png</code>. Load your sprites folder to see the real images in the
+  preview. Nothing is uploaded.</p>
+
+  <div class="tool">
+    <!-- ============ form ============ -->
+    <form id="form" autocomplete="off" onsubmit="return false;">
+
+      <fieldset>
+        <legend>File</legend>
+        <div class="field">
+          <label for="saveAs">Save as</label>
+          <input type="text" id="saveAs" value="character.json" spellcheck="false">
+        </div>
+        <p class="hint" style="grid-column:1/-1">Saved as <code id="savePath"></code>. This same
+        path, relative to <code>assets/sprites/</code>, is what the scene's <code>sprite</code>
+        command names as <code>image</code>.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Images — preview only</legend>
+        <div class="btn-row">
+          <label class="btn" for="folderInput">Load sprites folder…</label>
+          <input type="file" id="folderInput" webkitdirectory directory multiple hidden>
+          <label class="btn" for="imagesInput">Add images as assets…</label>
+          <input type="file" id="imagesInput" accept=".png,.jpg,.jpeg,image/png,image/jpeg" multiple hidden>
+          <button type="button" class="btn" id="clearImages">Forget images</button>
+        </div>
+        <p class="so-libstate" id="libState">No images loaded.</p>
+        <div class="field" id="openJsonRow" hidden>
+          <label for="openJson">Open from folder</label>
+          <select id="openJson"></select>
+        </div>
+        <div class="btn-row" id="fixPathsRow" hidden>
+          <button type="button" class="btn" id="fixPaths">Use full paths</button>
+          <span class="note" id="fixPathsNote"></span>
+        </div>
+        <p class="hint">Pick your game's <code>assets/sprites</code> folder (picking
+        <code>assets</code> or the whole game folder works too). Image paths are always relative
+        to <code>assets/sprites/</code>, wherever the sprite object itself is saved. Images stay
+        in your browser and nothing about them is written into the file.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Layers</legend>
+        <p class="hint">A layer is a depth. Every image sits on one layer, and a higher
+        <code>z</code> is drawn on top. The order of this list does not matter.</p>
+        <div class="list" id="layerList"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" id="addLayer">Add layer</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Assets</legend>
+        <p class="hint">One row per image. The order matters twice: the <strong>first</strong>
+        asset sets the sprite's width, and assets on layers with the same <code>z</code> are
+        drawn in this order, later on top. Every asset is hidden until an animation step
+        shows it.</p>
+        <div class="list" id="assetList"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" id="addAsset">Add asset</button>
+        </div>
+        <datalist id="libPaths"></datalist>
+      </fieldset>
+
+      <fieldset>
+        <legend>Animations</legend>
+        <p class="hint">Each animation shows exactly one of its assets at a time. All of them
+        start together and run independently. A <code>loop</code> repeats; a <code>once</code>
+        runs through and then holds its last step for good. A part that never changes, such as
+        a body, is a one-step <code>once</code>. Durations are in milliseconds;
+        <code>randomize</code> adds or subtracts up to that much, drawn fresh each time the step
+        comes round.</p>
+        <div id="animList"></div>
+        <div class="btn-row">
+          <button type="button" class="btn" id="addAnim">Add animation</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Edit an existing sprite object</legend>
+        <div class="btn-row">
+          <label class="btn" for="fileInput">Choose file…</label>
+          <input type="file" id="fileInput" accept=".json,application/json" hidden>
+          <button type="button" class="btn" id="resetBtn">Reset everything</button>
+        </div>
+        <div class="dropzone" id="dropZone">…or drop a sprite <code>.json</code> here, together
+        with its images if you like</div>
+      </fieldset>
+    </form>
+
+    <!-- ============ preview + output ============ -->
+    <div class="tool-side">
+      <div class="so-controls">
+        <div class="cf">
+          <span>Screen</span>
+          <select id="device"></select>
+        </div>
+        <div class="cf">
+          <span>Background</span>
+          <select id="bgMode">
+            <option value="gradient">gradient</option>
+            <option value="checker">checkerboard</option>
+            <option value="black">black</option>
+            <option value="white">white</option>
+            <option value="image">image…</option>
+          </select>
+          <input type="file" id="bgInput" accept="image/*" hidden>
+        </div>
+        <div class="cf">
+          <span>Position</span>
+          <select id="posMode">
+            <option value="center">center</option>
+            <option value="left">left</option>
+            <option value="right">right</option>
+            <option value="custom">x %, y %</option>
+          </select>
+        </div>
+        <div class="cf" id="customPos" hidden>
+          <span>x %, y %</span>
+          <div class="row">
+            <input type="number" id="posX" value="50" step="1">
+            <input type="number" id="posY" value="100" step="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-frame so-frame" id="frame">
+        <div class="so-stage preview-bg" id="stage"></div>
+        <div class="so-sprite" id="sprite"></div>
+        <div class="so-refused" id="refused" hidden>Not shown — the engine refuses this file.<br>
+          See the red notices below.</div>
+      </div>
+
+      <div class="btn-row so-playrow">
+        <button type="button" class="btn primary" id="playBtn">Pause</button>
+        <button type="button" class="btn" id="restartBtn">Restart</button>
+        <select id="speed" title="Playback speed">
+          <option value="0.1">0.1×</option>
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+        </select>
+        <label class="check"><input type="checkbox" id="randomOn" checked> randomize</label>
+        <label class="check"><input type="checkbox" id="boundsOn"> bounds</label>
+        <span class="so-clock" id="clock">0.0 s</span>
+      </div>
+
+      <div class="so-timelines" id="timelines"></div>
+      <p class="preview-meta" id="previewMeta"></p>
+
+      <div class="notices" id="notices"></div>
+
+      <div class="btn-row">
+        <button type="button" class="btn primary" id="copyBtn">Copy JSON</button>
+        <button type="button" class="btn" id="downloadBtn">Download</button>
+      </div>
+      <pre class="json-out" id="output"></pre>
+
+      <h3 class="so-h3">Use it in a scene</h3>
+      <div class="so-controls">
+        <div class="cf">
+          <span>Sprite id in the scene</span>
+          <input type="text" id="spriteId" value="character" spellcheck="false">
+        </div>
+      </div>
+      <pre class="json-out so-snippet" id="snippet"></pre>
+      <div class="btn-row">
+        <button type="button" class="btn" id="copySnippet">Copy command</button>
+        <span class="note">The position is the one set above the preview.</span>
+      </div>
+    </div>
+  </div>
 </div>
+
 <script src="../assets/js/sitemap.js"></script>
 <script src="../assets/js/nav.js"></script>
 <script src="../assets/js/cards.js"></script>
+<script src="../assets/js/engine-defaults.js"></script>
+<script src="../assets/js/tool.js"></script>
+<script>
+(function () {
+  var T = window.VNTool;
+
+  /* Mirrors GameEngine.js beginSpritePipeline(): the image types a sprite may use. */
+  var IMAGE_EXT = { png: true, jpg: true, jpeg: true };
+
+  /* The keys the engine reads. Anything else in a loaded file is kept and
+     written back unchanged — the engine ignores it. */
+  var LAYER_KEYS = ["id", "z"];
+  var ASSET_KEYS = ["id", "layer", "file"];
+  var ANIM_KEYS  = ["animationId", "type", "steps"];
+  var STEP_KEYS  = ["id", "duration", "randomize"];
+  var TOP_KEYS   = ["layers", "assets", "animations"];
+
+  /* A select's "nothing chosen" value. Ids may legitimately be "", so "" cannot be it. */
+  var NONE = "\u0000none";
+
+  /* ---------------------------------------------------------- small utils */
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function code(s) { return "<code>" + esc(s) + "</code>"; }
+  function isNum(v) { return typeof v === "number" && isFinite(v); }
+  function isStr(v) { return typeof v === "string"; }
+  function positive(v) { return typeof v === "number" && v > 0; }  /* the engine's duration test */
+  function extOf(path) {               /* GameEngine.js getExtension() */
+    var dot = path.lastIndexOf(".");
+    return dot <= 0 ? "" : path.substring(dot + 1).toLowerCase();
+  }
+  function baseName(path) { return path.substring(path.lastIndexOf("/") + 1); }
+  function seconds(ms) {
+    if (ms < 1000) return Math.round(ms) + " ms";
+    return (Math.round(ms / 100) / 10) + " s";
+  }
+
+  /* ---------------------------------------------------------------- state */
+  /* Each layer, asset, animation and step is the loaded object split in two:
+     the keys the engine reads, left exactly as loaded even when the type is
+     wrong (so the notices can say so), and _extra, everything else. A key
+     that is absent stays undefined and is not written. */
+
+  function starterDoc() {
+    return {
+      layers:     [ { id: "main", z: 0, _extra: {} } ],
+      assets:     [ { id: "base", layer: "main", file: "character/base.png", _extra: {} } ],
+      animations: [ { animationId: "idle", type: "once",
+                      steps: [ { id: "base", _extra: {} } ], _extra: {} } ],
+      _extra: {}
+    };
+  }
+
+  var doc = starterDoc();
+  var loadNotes = [];                  /* things noticed while loading a file */
+
+  var form       = $("form");
+  var output     = $("output");
+  var noticeBox  = $("notices");
+  var saveAsEl   = $("saveAs");
+  var layerList  = $("layerList");
+  var assetList  = $("assetList");
+  var animList   = $("animList");
+  var frame      = $("frame");
+  var stage      = $("stage");
+  var spriteBox  = $("sprite");
+  var timelines  = $("timelines");
+  var posMode    = $("posMode");
+  var posX       = $("posX");
+  var posY       = $("posY");
+  var spriteIdEl = $("spriteId");
+
+  /* ============================================================ library */
+  /* Images the user loaded, keyed by their path relative to assets/sprites/.
+     Only for the preview; nothing here reaches the JSON. */
+
+  var library = {
+    byPath:    {},      /* path -> { url, w, h, ready } */
+    folder:    null,    /* the folder read as assets/sprites/, if one was loaded */
+    jsonFiles: {},      /* path -> File: sprite objects found in that folder */
+    picked:    0        /* images added one by one, keyed by bare file name */
+  };
+
+  function libAdd(path, file) {
+    if (library.byPath[path]) URL.revokeObjectURL(library.byPath[path].url);
+    var entry = { url: URL.createObjectURL(file), w: 0, h: 0, ready: false };
+    library.byPath[path] = entry;
+    var probe = new Image();
+    probe.onload = function () {
+      entry.w = probe.naturalWidth;
+      entry.h = probe.naturalHeight;
+      entry.ready = true;
+      scheduleRefresh();
+    };
+    probe.src = entry.url;
+  }
+
+  function libClear() {
+    Object.keys(library.byPath).forEach(function (p) { URL.revokeObjectURL(library.byPath[p].url); });
+    library.byPath = {};
+    library.folder = null;
+    library.jsonFiles = {};
+    library.picked = 0;
+  }
+
+  function libHasAny() { return Object.keys(library.byPath).length > 0; }
+
+  /* How a file path from the JSON finds a loaded image:
+       exact   the path exists as written
+       case    it exists only if upper and lower case are ignored — missing on the phone
+       name    only the file name matches, and only one loaded image has that name
+       null    not found */
+  function resolve(path) {
+    if (!isStr(path) || path === "") return null;
+    if (library.byPath[path]) return { entry: library.byPath[path], how: "exact", path: path };
+    var lower = path.toLowerCase(), key, hits = [];
+    for (key in library.byPath) {
+      if (key.toLowerCase() === lower) return { entry: library.byPath[key], how: "case", path: key };
+    }
+    var name = baseName(path);
+    for (key in library.byPath) if (baseName(key) === name) hits.push(key);
+    if (hits.length === 1) return { entry: library.byPath[hits[0]], how: "name", path: hits[0] };
+    return null;
+  }
+
+  /* A folder pick gives "<chosen>/<...>". If the chosen folder sits above
+     assets/sprites, cut through that; otherwise read the chosen folder itself
+     as assets/sprites. */
+  function loadFolder(files) {
+    var images = [], jsons = [], root = null, cutAtAssets = false;
+    var MARK = "assets/sprites/";
+    Array.prototype.forEach.call(files, function (f) {
+      if ((f.webkitRelativePath || f.name).indexOf(MARK) !== -1) cutAtAssets = true;
+    });
+    Array.prototype.forEach.call(files, function (f) {
+      var rel = f.webkitRelativePath || f.name, path;
+      if (cutAtAssets) {
+        var at = rel.indexOf(MARK);
+        if (at === -1) return;                       /* outside the sprites folder */
+        path = rel.substring(at + MARK.length);
+        root = rel.substring(0, at) + "assets/sprites";
+      } else {
+        var slash = rel.indexOf("/");
+        path = slash === -1 ? rel : rel.substring(slash + 1);
+        root = slash === -1 ? "" : rel.substring(0, slash);
+      }
+      var ext = extOf(path);
+      if (IMAGE_EXT[ext] === true) images.push([path, f]);
+      else if (ext === "json") jsons.push([path, f]);
+    });
+
+    if (!images.length && !jsons.length) {
+      alert("No .png, .jpg or .json files were found in that folder.");
+      return;
+    }
+    libClear();
+    library.folder = root || "(folder)";
+    images.forEach(function (p) { libAdd(p[0], p[1]); });
+    jsons.forEach(function (p) { library.jsonFiles[p[0]] = p[1]; });
+    renderForm();
+  }
+
+  function renderLibrary() {
+    var paths = Object.keys(library.byPath).sort();
+    var parts = [];
+    if (library.folder !== null)
+      parts.push((paths.length - library.picked) + " images from <code>" + esc(library.folder) +
+                 "/</code>, read as <code>assets/sprites/</code>");
+    if (library.picked) parts.push(library.picked + " added one by one");
+    $("libState").innerHTML = parts.length ? parts.join("; ") + "." : "No images loaded.";
+
+    var dl = $("libPaths");
+    dl.innerHTML = "";
+    paths.forEach(function (p) {
+      var o = el("option");
+      o.value = p;
+      dl.appendChild(o);
+    });
+
+    var jsonPaths = Object.keys(library.jsonFiles).sort();
+    var sel = $("openJson");
+    sel.innerHTML = "";
+    var first = el("option", null, jsonPaths.length + " sprite object" +
+                   (jsonPaths.length === 1 ? "" : "s") + " found…");
+    first.value = "";
+    sel.appendChild(first);
+    jsonPaths.forEach(function (p) {
+      var o = el("option", null, p);
+      o.value = p;
+      sel.appendChild(o);
+    });
+    $("openJsonRow").hidden = jsonPaths.length === 0;
+  }
+
+  /* ===================================================== load and save */
+
+  function splitEntry(raw, keys, where) {
+    var e = { _extra: {} };
+    if (!T.isPlainObject(raw)) {
+      loadNotes.push(where + " was not an object (" + code(JSON.stringify(raw)) +
+                     ") and was replaced by an empty one.");
+      return e;
+    }
+    for (var k in raw) {
+      if (keys.indexOf(k) !== -1) e[k] = raw[k];
+      else e._extra[k] = raw[k];
+    }
+    return e;
+  }
+
+  function listOf(raw, key) {
+    if (raw[key] === undefined) {
+      loadNotes.push("The file has no <code>" + key + "</code> list.");
+      return [];
+    }
+    if (!Array.isArray(raw[key])) {
+      loadNotes.push("<code>" + key + "</code> was not a list (" + code(JSON.stringify(raw[key])) +
+                     ") and was dropped.");
+      return [];
+    }
+    return raw[key];
+  }
+
+  function fromJson(raw) {
+    if (!T.isPlainObject(raw)) throw new Error("The file is not a JSON object.");
+    loadNotes = [];
+    var next = { layers: [], assets: [], animations: [], _extra: {} };
+    for (var k in raw) if (TOP_KEYS.indexOf(k) === -1) next._extra[k] = raw[k];
+
+    next.layers = listOf(raw, "layers").map(function (l, i) {
+      return splitEntry(l, LAYER_KEYS, "Layer " + (i + 1));
+    });
+    next.assets = listOf(raw, "assets").map(function (a, i) {
+      return splitEntry(a, ASSET_KEYS, "Asset " + (i + 1));
+    });
+    next.animations = listOf(raw, "animations").map(function (a, i) {
+      var e = splitEntry(a, ANIM_KEYS, "Animation " + (i + 1));
+      if (e.steps === undefined) {
+        e.steps = [];
+      } else if (!Array.isArray(e.steps)) {
+        loadNotes.push("Animation " + (i + 1) + ": <code>steps</code> was not a list and was dropped.");
+        e.steps = [];
+      } else {
+        e.steps = e.steps.map(function (s, j) {
+          return splitEntry(s, STEP_KEYS, "Animation " + (i + 1) + ", step " + (j + 1));
+        });
+      }
+      return e;
+    });
+    return next;
+  }
+
+  function loadText(text, name) {
+    var raw, next;
+    try { raw = JSON.parse(text); }
+    catch (e) { alert("That is not valid JSON:\n" + e.message); return; }
+    try { next = fromJson(raw); }
+    catch (e) { alert(e.message); return; }
+    doc = next;
+    if (name) {
+      saveAsEl.value = name;
+      spriteIdEl.value = defaultSpriteId(name);
+    }
+    renderForm();
+  }
+
+  function entryJson(e, keys) {
+    var o = {}, k;
+    keys.forEach(function (key) { if (e[key] !== undefined) o[key] = e[key]; });
+    for (k in e._extra) if (!(k in o)) o[k] = e._extra[k];
+    return o;
+  }
+
+  function toJson() {
+    var o = {
+      layers: doc.layers.map(function (l) { return entryJson(l, LAYER_KEYS); }),
+      assets: doc.assets.map(function (a) { return entryJson(a, ASSET_KEYS); }),
+      animations: doc.animations.map(function (an) {
+        var shallow = { animationId: an.animationId, type: an.type, _extra: an._extra,
+                        steps: an.steps.map(function (s) { return entryJson(s, STEP_KEYS); }) };
+        return entryJson(shallow, ANIM_KEYS);
+      })
+    };
+    for (var k in doc._extra) if (!(k in o)) o[k] = doc._extra[k];
+    return o;
+  }
+
+  /* --- formatting: one line per layer, asset and step, the way the sample
+     liisaBlink.json is written, with the first column padded so a list of
+     steps reads like a timetable. */
+
+  function indentBlock(text, pad) {
+    return text.split("\n").map(function (line, i) { return i === 0 ? line : pad + line; }).join("\n");
+  }
+
+  function inlineList(items, pad) {
+    if (!Array.isArray(items)) return JSON.stringify(items);
+    if (!items.length) return "[]";
+    var heads = items.map(function (o) {
+      var ks = Object.keys(o);
+      if (!ks.length) return "";
+      return JSON.stringify(ks[0]) + ": " + JSON.stringify(o[ks[0]]) + (ks.length > 1 ? "," : "");
+    });
+    /* Pad only while the heads are of similar length; one long id would push
+       every other line far to the right. */
+    var width = 0, shortest = Infinity;
+    items.forEach(function (o, i) {
+      if (Object.keys(o).length > 1) {
+        width = Math.max(width, heads[i].length);
+        shortest = Math.min(shortest, heads[i].length);
+      }
+    });
+    if (width - shortest > 10) width = 0;
+    var lines = items.map(function (o, i) {
+      var ks = Object.keys(o);
+      if (!ks.length) return pad + "    {}";
+      var rest = ks.slice(1).map(function (k) { return JSON.stringify(k) + ": " + JSON.stringify(o[k]); });
+      var head = heads[i];
+      if (rest.length) while (head.length < width) head += " ";
+      return pad + "    { " + head + (rest.length ? " " + rest.join(", ") : "") + " }";
+    });
+    return "[\n" + lines.join(",\n") + "\n" + pad + "]";
+  }
+
+  function objectBlock(o, pad, special) {
+    var keys = Object.keys(o);
+    if (!keys.length) return "{}";
+    var lines = keys.map(function (k) {
+      var v = special && special[k] ? special[k](o[k], pad + "    ")
+                                     : indentBlock(JSON.stringify(o[k], null, 4), pad + "    ");
+      return pad + "    " + JSON.stringify(k) + ": " + v;
+    });
+    return "{\n" + lines.join(",\n") + "\n" + pad + "}";
+  }
+
+  function formatDoc(o) {
+    function animations(list, pad) {
+      if (!list.length) return "[]";
+      return "[\n" + list.map(function (an) {
+        return pad + "    " + objectBlock(an, pad + "    ", { steps: inlineList });
+      }).join(",\n") + "\n" + pad + "]";
+    }
+    return objectBlock(o, "", { layers: inlineList, assets: inlineList, animations: animations }) + "\n";
+  }
+
+  /* ========================================================= validation */
+  /* Every "err" is a case where GameEngine.js normalizeSpriteState() logs and
+     returns null, so the sprite is not shown at all. The engine stops at the
+     first one; this lists them all. "warn" loads, but probably does not do
+     what you meant. "info" is just worth knowing. */
+
+  function layerName(l, i) { return isStr(l.id) && l.id !== "" ? "Layer " + code(l.id) : "Layer " + (i + 1); }
+  function assetName(a, i) { return isStr(a.id) && a.id !== "" ? "Asset " + code(a.id) : "Asset " + (i + 1); }
+  function animName(an, i) {
+    return isStr(an.animationId) && an.animationId !== "" ? code(an.animationId) : "Animation " + (i + 1);
+  }
+
+  /* The type the engine actually runs: a one-step loop becomes once. */
+  function effectiveType(an) {
+    return an.type === "loop" && an.steps.length === 1 ? "once" : an.type;
+  }
+  /* Only this step may go without a duration, and it is never timed. */
+  function isHoldStep(an, j) { return effectiveType(an) === "once" && j === an.steps.length - 1; }
+
+  function validate() {
+    var out = [];
+    function err(m)  { out.push(["err", m]); }
+    function warn(m) { out.push(["warn", m]); }
+    function info(m) { out.push(["info", m]); }
+
+    /* ----- layers: buildLayersById() */
+    var layerZ = {};
+    if (!doc.layers.length) err("There are no layers. A sprite object needs at least one.");
+    doc.layers.forEach(function (l, i) {
+      var name = layerName(l, i);
+      if (!isStr(l.id)) err("Layer " + (i + 1) + " has no id.");
+      else if (l.id === "") warn("Layer " + (i + 1) + " has an empty id. The engine accepts it, but it is easy to lose track of.");
+      if (typeof l.z !== "number")
+        err(name + " needs a number for <code>z</code>" +
+            (l.z === undefined ? "." : ", not " + code(JSON.stringify(l.z)) + "."));
+      if (isStr(l.id)) {
+        if (layerZ.hasOwnProperty(l.id)) err("Two layers are called " + code(l.id) + ".");
+        else layerZ[l.id] = l.z;
+      }
+    });
+
+    /* ----- assets: buildAssets() */
+    var assetIds = {};
+    if (!doc.assets.length) err("There are no assets. A sprite object needs at least one image.");
+    doc.assets.forEach(function (a, i) {
+      var name = assetName(a, i);
+      if (!isStr(a.id)) err("Asset " + (i + 1) + " has no id.");
+      else if (a.id === "") warn("Asset " + (i + 1) + " has an empty id.");
+      if (!isStr(a.layer)) err(name + " is not on a layer.");
+      else if (!layerZ.hasOwnProperty(a.layer)) err(name + " is on layer " + code(a.layer) + ", which does not exist.");
+      if (!isStr(a.file)) err(name + " has no file.");
+      if (isStr(a.id)) {
+        if (assetIds.hasOwnProperty(a.id)) err("Two assets are called " + code(a.id) + ".");
+        else assetIds[a.id] = i;
+      }
+      if (isStr(a.file)) checkFile(a, name, warn, info);
+    });
+
+    /* ----- animations: resolveAnimations() */
+    var usedBy = {};                    /* asset id -> animation names */
+    var layerAnims = {};                /* layer id -> animation names */
+    var animIds = {};
+    if (!doc.animations.length) err("There are no animations. Nothing would ever be shown — every asset starts hidden.");
+    doc.animations.forEach(function (an, i) {
+      var name = animName(an, i);
+      if (an.type !== "loop" && an.type !== "once")
+        err(name + " has type " + (an.type === undefined ? "nothing" : code(JSON.stringify(an.type))) +
+            ". It has to be <code>loop</code> or <code>once</code>.");
+      if (!an.steps.length) err(name + " has no steps.");
+
+      if (!isStr(an.animationId) || an.animationId === "")
+        warn("Animation " + (i + 1) + " has no <code>animationId</code>. The engine calls it " +
+             code("aid" + i) + " and logs a warning.");
+      else if (animIds[an.animationId])
+        warn("Two animations are called " + code(an.animationId) + ". The engine does not check " +
+             "this today, but anything that names an animation later could only find one of them.");
+      else animIds[an.animationId] = true;
+
+      if (an.type === "loop" && an.steps.length === 1)
+        warn(name + " is a <code>loop</code> with one step. The engine turns it into a " +
+             "<code>once</code> and logs a warning — set it to <code>once</code> yourself.");
+
+      an.steps.forEach(function (s, j) {
+        var where = name + ", step " + (j + 1);
+        var hold = isHoldStep(an, j);
+        if (!isStr(s.id)) err(where + ": no asset chosen.");
+        else if (!assetIds.hasOwnProperty(s.id)) err(where + ": " + code(s.id) + " is not an asset.");
+        else {
+          usedBy[s.id] = usedBy[s.id] || [];
+          if (usedBy[s.id].indexOf(name) === -1) usedBy[s.id].push(name);
+          var lay = doc.assets[assetIds[s.id]].layer;
+          if (isStr(lay)) {
+            layerAnims[lay] = layerAnims[lay] || [];
+            if (layerAnims[lay].indexOf(name) === -1) layerAnims[lay].push(name);
+          }
+        }
+
+        if (!positive(s.duration) && !hold)
+          err(where + ": needs a duration above 0 ms. Only the last step of a <code>once</code> " +
+              "animation may go without one.");
+        else if (positive(s.duration) && hold)
+          info(name + ": the last step of a <code>once</code> animation is held for good, so its " +
+               "duration (" + s.duration + " ms) is never used.");
+
+        if (s.randomize !== undefined && (typeof s.randomize !== "number" || s.randomize < 0))
+          err(where + ": <code>randomize</code> has to be a number, 0 or more.");
+        else if (isNum(s.randomize) && s.randomize > 0 && hold)
+          info(where + ": randomize does nothing on a held last step.");
+        else if (isNum(s.randomize) && s.randomize > 0 && positive(s.duration) && s.randomize >= s.duration)
+          warn(where + ": randomize " + s.randomize + " ms is not below the duration " + s.duration +
+               " ms, so the step can come out at 0 ms or less. The engine makes that 1 ms — a flicker.");
+      });
+    });
+
+    /* ----- loads fine, behaves surprisingly */
+    var unused = doc.assets.filter(function (a) { return isStr(a.id) && !usedBy[a.id]; })
+                           .map(function (a) { return code(a.id); });
+    if (unused.length)
+      warn("Never shown: " + unused.join(", ") + ". No animation step uses " +
+           (unused.length === 1 ? "it" : "them") + ", and every asset starts hidden. The engine " +
+           "still loads " + (unused.length === 1 ? "it" : "them") + " into memory.");
+
+    Object.keys(usedBy).forEach(function (id) {
+      if (usedBy[id].length > 1)
+        warn("Asset " + code(id) + " is used by " + usedBy[id].join(" and ") + ". Each animation " +
+             "hides its previous image when it moves on, so one switches it off while the other " +
+             "still means it to show. Give each animation its own assets.");
+    });
+
+    Object.keys(layerAnims).forEach(function (lay) {
+      if (layerAnims[lay].length > 1)
+        info("Layer " + code(lay) + " is used by " + layerAnims[lay].join(" and ") + ", so two " +
+             "images show on it at once. Between them, the one later in the asset list is on top.");
+    });
+
+    var byZ = {};
+    doc.layers.forEach(function (l) {
+      if (isStr(l.id) && isNum(l.z)) (byZ[l.z] = byZ[l.z] || []).push(code(l.id));
+    });
+    Object.keys(byZ).forEach(function (z) {
+      if (byZ[z].length > 1)
+        info("Layers " + byZ[z].join(", ") + " share z " + z + ". Between them, the order of the " +
+             "asset list decides what is on top.");
+    });
+
+    doc.layers.forEach(function (l, i) {
+      if (!isStr(l.id)) return;
+      if (!doc.assets.some(function (a) { return a.layer === l.id; }))
+        info(layerName(l, i) + " has no assets on it.");
+    });
+
+    checkSizes(warn);
+
+    if (!libHasAny())
+      info("Load your sprites folder to see the real images here, and to check every path.");
+
+    /* ----- kept from a loaded file */
+    var extras = [];
+    Object.keys(doc._extra).forEach(function (k) { extras.push(k); });
+    doc.layers.forEach(function (l, i) { Object.keys(l._extra).forEach(function (k) { extras.push("layer " + (i + 1) + ": " + k); }); });
+    doc.assets.forEach(function (a, i) { Object.keys(a._extra).forEach(function (k) { extras.push("asset " + (i + 1) + ": " + k); }); });
+    doc.animations.forEach(function (an, i) {
+      Object.keys(an._extra).forEach(function (k) { extras.push("animation " + (i + 1) + ": " + k); });
+      an.steps.forEach(function (s, j) {
+        Object.keys(s._extra).forEach(function (k) { extras.push("animation " + (i + 1) + " step " + (j + 1) + ": " + k); });
+      });
+    });
+    if (extras.length)
+      info("Kept from the file you loaded, unchanged, and ignored by the engine: " +
+           extras.map(code).join(", ") + ".");
+    loadNotes.forEach(function (m) { info(m); });
+
+    return out;
+  }
+
+  function checkFile(a, name, warn, info) {
+    var f = a.file, r = resolve(f);
+    if (f === "") { warn(name + " has an empty file path, so no image loads."); return; }
+    if (f.charAt(0) === "/" || f.indexOf("\\") !== -1 || f.indexOf("..") !== -1)
+      warn(name + ": " + code(f) + " should be a plain path below <code>assets/sprites/</code> — " +
+           "no leading <code>/</code>, no <code>..</code>, forward slashes only.");
+    else if (f.indexOf("sprites/") === 0 && !(r && r.how === "exact"))
+      warn(name + ": paths are already relative to <code>assets/sprites/</code>, so " + code(f) +
+           " looks in <code>assets/sprites/sprites/</code>.");
+    if (IMAGE_EXT[extOf(f)] !== true)
+      warn(name + ": " + code(f) + " is not a .png, .jpg or .jpeg.");
+    if (!libHasAny()) return;
+    if (r === null) warn(name + ": " + code(f) + " is not among the images you loaded.");
+    else if (r.how === "case")
+      warn(name + ": " + code(f) + " only matches " + code(r.path) + " if upper and lower case are " +
+           "ignored. The phone does not ignore them, so this image would be missing.");
+    else if (r.how === "name")
+      info(name + ": " + code(f) + " was found by file name only, at " + code(r.path) + ". On the " +
+           "phone the path has to be complete.");
+  }
+
+  /* Each image is scaled to the sprite's height and pinned at its top-left
+     corner, and the sprite is as wide as the first asset. Layers only line up
+     when they share one shape — full-canvas exports. */
+  function checkSizes(warn) {
+    var first = null, odd = [];
+    doc.assets.forEach(function (a) {
+      var r = resolve(a.file);
+      if (!r || !r.entry.ready || !r.entry.h) return;
+      var aspect = r.entry.w / r.entry.h;
+      if (first === null) { first = { id: a.id, aspect: aspect, w: r.entry.w, h: r.entry.h }; return; }
+      if (Math.abs(aspect - first.aspect) / first.aspect > 0.005)
+        odd.push(code(a.id) + " (" + r.entry.w + "×" + r.entry.h + ")");
+    });
+    if (odd.length)
+      warn("Not the same shape as " + code(first.id) + " (" + first.w + "×" + first.h + "): " +
+           odd.join(", ") + ". Every image is scaled to the sprite's height and pinned to its " +
+           "top-left corner, so these will not line up. Export every layer at the full canvas size.");
+  }
+
+  /* ============================================================== form */
+
+  function uniqueId(base, list, key) {
+    key = key || "id";
+    var taken = {};
+    list.forEach(function (e) { if (isStr(e[key])) taken[e[key]] = true; });
+    if (!taken[base]) return base;
+    for (var n = 2; ; n++) if (!taken[base + "_" + n]) return base + "_" + n;
+  }
+
+  function idsOf(list) {
+    return list.filter(function (e) { return isStr(e.id); }).map(function (e) { return e.id; });
+  }
+
+  /* After an id is edited, carry the rename over to whatever referred to it — but
+     only when the rename is clean: nothing else still answers to the old id and
+     the new one is not taken twice. Otherwise the references stay as they are and
+     the notices show the mismatch. */
+  function renameRefs(kind, oldId, newId) {
+    if (!isStr(oldId) || oldId === newId) return;
+    var list = kind === "layer" ? doc.layers : doc.assets;
+    var stillOld = list.filter(function (e) { return e.id === oldId; }).length;
+    var nowNew   = list.filter(function (e) { return e.id === newId; }).length;
+    if (stillOld > 0 || nowNew > 1) return;
+    if (kind === "layer") {
+      doc.assets.forEach(function (a) { if (a.layer === oldId) a.layer = newId; });
+    } else {
+      doc.animations.forEach(function (an) {
+        an.steps.forEach(function (s) { if (s.id === oldId) s.id = newId; });
+      });
+    }
+  }
+
+  /* The rename is applied when the field is left, not per keystroke — typing
+     "eyes" on the way to "eyesOpen" would otherwise grab every reference to an
+     existing "eyes". Only the dependent section is redrawn, so focus moving to
+     the next field in this list survives. */
+  var focusIds = {};
+  function trackRename(input, entry, kind) {
+    input.addEventListener("focus", function () { focusIds[kind] = entry.id; });
+    input.addEventListener("change", function () {
+      renameRefs(kind, focusIds[kind], entry.id);
+      focusIds[kind] = entry.id;
+      if (kind === "layer") renderAssets();
+      else renderAnims();
+      refresh();
+    });
+  }
+
+  function cell(label, input, cls) {
+    var c = el("div", "cell" + (cls ? " " + cls : ""));
+    c.appendChild(el("span", null, label));
+    c.appendChild(input);
+    return c;
+  }
+
+  function textInput(value, onInput) {
+    var i = el("input");
+    i.type = "text";
+    i.spellcheck = false;
+    i.value = value === undefined ? "" : String(value);
+    i.addEventListener("input", function () { onInput(i.value); });
+    return i;
+  }
+
+  /* A number box that writes undefined when emptied, so an optional key can be
+     taken out again. A loaded value of the wrong type is shown as text until
+     replaced. */
+  function numberInput(value, placeholder, onInput) {
+    var i = el("input");
+    i.type = isNum(value) || value === undefined ? "number" : "text";
+    i.step = "any";
+    i.value = value === undefined ? "" : String(value);
+    if (placeholder) i.placeholder = placeholder;
+    i.addEventListener("input", function () {
+      if (i.value.trim() === "") { onInput(undefined); return; }
+      var n = parseFloat(i.value);
+      if (!isNaN(n)) onInput(n);
+    });
+    return i;
+  }
+
+  /* A select over a list of ids. A loaded value that is not in the list stays
+     selected, marked, rather than being silently swapped for something valid. */
+  function idSelect(ids, current, missingLabel, onChange) {
+    var s = el("select");
+    if (current === undefined) {
+      var none = el("option", null, "—");
+      none.value = NONE;
+      s.appendChild(none);
+    }
+    var opts = ids.slice();
+    if (current !== undefined && opts.indexOf(current) === -1) opts.push(current);
+    opts.forEach(function (id) {
+      var o = el("option");
+      o.value = String(id);
+      o.textContent = ids.indexOf(id) === -1 ? String(id) + " (" + missingLabel + ")"
+                                             : (id === "" ? "(empty id)" : id);
+      s.appendChild(o);
+    });
+    s.value = current === undefined ? NONE : String(current);
+    s.addEventListener("change", function () { onChange(s.value === NONE ? undefined : s.value); });
+    return s;
+  }
+
+  function toolButton(label, title, onClick, cls) {
+    var b = el("button", cls || null);
+    b.type = "button";
+    b.innerHTML = label;
+    b.title = title;
+    b.setAttribute("aria-label", title);
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function move(list, i, d) {
+    var j = i + d;
+    if (j < 0 || j >= list.length) return false;
+    var t = list[i]; list[i] = list[j]; list[j] = t;
+    return true;
+  }
+
+  /* --------------------------------------------------------------- layers */
+
+  function renderLayers() {
+    layerList.innerHTML = "";
+    if (!doc.layers.length) { layerList.appendChild(el("p", "list-empty", "None.")); return; }
+    doc.layers.forEach(function (l, i) {
+      var row = el("div", "list-row so-layer-row");
+      var idIn = textInput(l.id, function (v) { l.id = v; refresh(); });
+      trackRename(idIn, l, "layer");
+      row.appendChild(cell("id", idIn));
+      row.appendChild(cell("z", numberInput(l.z, "", function (v) { l.z = v; refresh(); })));
+      var n = doc.assets.filter(function (a) { return a.layer === l.id; }).length;
+      row.appendChild(cell("assets", el("div", "so-count", String(n))));
+      row.appendChild(toolButton("&times;", "Remove layer", function () {
+        doc.layers.splice(i, 1);
+        renderForm();
+      }, "rm"));
+      layerList.appendChild(row);
+    });
+  }
+
+  /* --------------------------------------------------------------- assets */
+
+  function thumbFor(file) {
+    var box = el("div", "so-thumb");
+    var r = resolve(file);
+    if (r) {
+      var img = el("img");
+      img.src = r.entry.url;
+      img.alt = "";
+      box.appendChild(img);
+      if (r.how !== "exact") box.classList.add("approx");
+      box.title = r.path;
+    } else if (libHasAny()) {
+      box.textContent = "?";
+      box.title = "Not among the loaded images";
+    }
+    return box;
+  }
+
+  function renderAssets() {
+    assetList.innerHTML = "";
+    if (!doc.assets.length) { assetList.appendChild(el("p", "list-empty", "None.")); return; }
+    var layerIds = idsOf(doc.layers);
+    doc.assets.forEach(function (a, i) {
+      var row = el("div", "list-row so-asset-row");
+      var thumb = thumbFor(a.file);
+      row.appendChild(thumb);
+
+      var idIn = textInput(a.id, function (v) { a.id = v; refresh(); });
+      trackRename(idIn, a, "asset");
+      row.appendChild(cell("id", idIn, "so-a-id"));
+
+      row.appendChild(cell("layer", idSelect(layerIds, a.layer, "missing", function (v) {
+        a.layer = v;
+        renderLayers();
+        refresh();
+      }), "so-a-layer"));
+
+      var fileIn = textInput(a.file, function (v) {
+        a.file = v;
+        var fresh = thumbFor(v);
+        row.replaceChild(fresh, thumb);
+        thumb = fresh;
+        refresh();
+      });
+      fileIn.setAttribute("list", "libPaths");
+      fileIn.placeholder = "folder/image.png";
+      row.appendChild(cell("file, in assets/sprites/", fileIn, "so-a-file"));
+
+      var tools = el("div", "so-rowtools");
+      tools.appendChild(toolButton("&uarr;", "Move up", function () { if (move(doc.assets, i, -1)) renderForm(); }));
+      tools.appendChild(toolButton("&darr;", "Move down", function () { if (move(doc.assets, i, 1)) renderForm(); }));
+      tools.appendChild(toolButton("&times;", "Remove asset", function () {
+        doc.assets.splice(i, 1);
+        renderForm();
+      }, "danger"));
+      row.appendChild(tools);
+      assetList.appendChild(row);
+    });
+  }
+
+  /* ----------------------------------------------------------- animations */
+
+  function cycleText(an) {
+    var type = effectiveType(an), lo = 0, hi = 0, nominal = 0, bad = false;
+    if (!an.steps.length || (type !== "loop" && type !== "once")) return "";
+    an.steps.forEach(function (s, j) {
+      if (isHoldStep(an, j)) return;
+      if (!positive(s.duration)) { bad = true; return; }
+      var r = isNum(s.randomize) && s.randomize > 0 ? s.randomize : 0;
+      nominal += s.duration;
+      lo += Math.max(1, s.duration - r);
+      hi += s.duration + r;
+    });
+    if (bad) return "";
+    var span = lo === hi ? seconds(nominal) : seconds(nominal) + " (" + seconds(lo) + " – " + seconds(hi) + ")";
+    if (type === "loop") return "One cycle: " + span + ".";
+    var last = an.steps[an.steps.length - 1];
+    var holdOn = isStr(last.id) ? last.id : "?";
+    return an.steps.length === 1 ? "Shows " + holdOn + " for good."
+                                 : "Runs " + span + ", then holds " + holdOn + ".";
+  }
+
+  function renderAnims() {
+    animList.innerHTML = "";
+    if (!doc.animations.length) { animList.appendChild(el("p", "list-empty", "None.")); return; }
+    var assetIds = idsOf(doc.assets);
+
+    doc.animations.forEach(function (an, i) {
+      var card = el("div", "so-anim");
+
+      var head = el("div", "so-anim-head");
+      head.appendChild(cell("animationId", textInput(an.animationId, function (v) { an.animationId = v; refresh(); })));
+
+      var typeSel = el("select");
+      var types = ["loop", "once"];
+      if (an.type !== undefined && types.indexOf(an.type) === -1) types.push(an.type);
+      if (an.type === undefined) {
+        var none = el("option", null, "—");
+        none.value = NONE;
+        typeSel.appendChild(none);
+      }
+      types.forEach(function (t) {
+        var o = el("option", null, t === "loop" || t === "once" ? t : String(t) + " (unknown)");
+        o.value = String(t);
+        typeSel.appendChild(o);
+      });
+      typeSel.value = an.type === undefined ? NONE : String(an.type);
+      typeSel.addEventListener("change", function () {
+        an.type = typeSel.value === NONE ? undefined : typeSel.value;
+        renderForm();
+      });
+      head.appendChild(cell("type", typeSel));
+
+      var tools = el("div", "so-rowtools");
+      tools.appendChild(toolButton("&uarr;", "Move animation up", function () { if (move(doc.animations, i, -1)) renderForm(); }));
+      tools.appendChild(toolButton("&darr;", "Move animation down", function () { if (move(doc.animations, i, 1)) renderForm(); }));
+      tools.appendChild(toolButton("&#x29C9;", "Duplicate animation", function () {
+        var copy = JSON.parse(JSON.stringify(an));
+        if (isStr(copy.animationId)) copy.animationId = uniqueId(copy.animationId, doc.animations, "animationId");
+        doc.animations.splice(i + 1, 0, copy);
+        renderForm();
+      }));
+      tools.appendChild(toolButton("&times;", "Remove animation", function () {
+        doc.animations.splice(i, 1);
+        renderForm();
+      }, "danger"));
+      head.appendChild(tools);
+      card.appendChild(head);
+
+      var sum = el("p", "so-anim-sum", cycleText(an));
+      sum.setAttribute("data-anim-sum", i);
+      card.appendChild(sum);
+
+      var steps = el("div", "so-steps");
+      an.steps.forEach(function (s, j) {
+        var row = el("div", "so-step");
+        row.setAttribute("data-step", i + "-" + j);
+        row.appendChild(el("span", "so-step-n", String(j + 1)));
+        row.appendChild(cell("asset", idSelect(assetIds, s.id, "not an asset", function (v) {
+          s.id = v;
+          refresh();
+        })));
+        var hold = isHoldStep(an, j);
+        row.appendChild(cell(hold ? "held — no duration" : "duration ms",
+          numberInput(s.duration, hold ? "hold" : "ms", function (v) { s.duration = v; refresh(); })));
+        row.appendChild(cell("± randomize ms",
+          numberInput(s.randomize, "0", function (v) { s.randomize = v; refresh(); })));
+
+        var st = el("div", "so-rowtools");
+        st.appendChild(toolButton("&uarr;", "Move step up", function () { if (move(an.steps, j, -1)) renderForm(); }));
+        st.appendChild(toolButton("&darr;", "Move step down", function () { if (move(an.steps, j, 1)) renderForm(); }));
+        st.appendChild(toolButton("&#x29C9;", "Duplicate step", function () {
+          an.steps.splice(j + 1, 0, JSON.parse(JSON.stringify(s)));
+          renderForm();
+        }));
+        st.appendChild(toolButton("&times;", "Remove step", function () {
+          an.steps.splice(j, 1);
+          renderForm();
+        }, "danger"));
+        row.appendChild(st);
+        steps.appendChild(row);
+      });
+      card.appendChild(steps);
+
+      var add = el("div", "btn-row");
+      add.appendChild(toolButton("Add step", "Add a step at the end", function () { addStep(an); }, "btn"));
+      card.appendChild(add);
+
+      animList.appendChild(card);
+    });
+  }
+
+  /* A new step copies the previous duration and moves on to the next asset in
+     the list — alternating images is the common case. A held last step without a
+     duration is no longer last, so it gets one. */
+  function addStep(an) {
+    var prev = an.steps.length ? an.steps[an.steps.length - 1] : null;
+    var ids = idsOf(doc.assets);
+    var next = { _extra: {} };
+    if (prev && isStr(prev.id) && ids.indexOf(prev.id) !== -1) next.id = ids[(ids.indexOf(prev.id) + 1) % ids.length];
+    else if (ids.length) next.id = ids[0];
+    if (prev && !positive(prev.duration)) prev.duration = 1000;
+    next.duration = prev ? prev.duration : 1000;
+    an.steps.push(next);
+    renderForm();
+  }
+
+  function renderForm() {
+    renderLayers();
+    renderAssets();
+    renderAnims();
+    renderLibrary();
+    modelKey = null;           /* rebuild the preview, even if only images changed */
+    refresh();
+  }
+
+  $("addLayer").addEventListener("click", function () {
+    var z = 0;
+    doc.layers.forEach(function (l) { if (isNum(l.z) && l.z + 10 > z) z = l.z + 10; });
+    doc.layers.push({ id: uniqueId("layer", doc.layers), z: z, _extra: {} });
+    renderForm();
+  });
+
+  $("addAsset").addEventListener("click", function () {
+    var layerIds = idsOf(doc.layers);
+    var a = { id: uniqueId("asset", doc.assets), file: "", _extra: {} };
+    if (layerIds.length) a.layer = layerIds[layerIds.length - 1];
+    doc.assets.push(a);
+    renderForm();
+  });
+
+  /* A new animation starts on the first asset nothing shows yet, as a one-step
+     once — exactly what a part that never changes needs. */
+  $("addAnim").addEventListener("click", function () {
+    var used = {};
+    doc.animations.forEach(function (an) { an.steps.forEach(function (s) { used[s.id] = true; }); });
+    var ids = idsOf(doc.assets);
+    var pick = ids.filter(function (id) { return !used[id]; })[0];
+    if (pick === undefined) pick = ids[0];
+    var step = { _extra: {} };
+    if (pick !== undefined) step.id = pick;
+    doc.animations.push({ animationId: uniqueId(pick !== undefined ? pick : "animation", doc.animations, "animationId"),
+                          type: "once", steps: [step], _extra: {} });
+    renderForm();
+  });
+
+  /* ============================================================ preview */
+
+  /* What normalizeSpriteState() returns for a file with no errors: assets carry
+     their layer's z, a one-step loop is once, a missing duration on the held
+     step is 0 and a missing randomize is 0. */
+  function normalize() {
+    var z = {};
+    doc.layers.forEach(function (l) { z[l.id] = l.z; });
+    return {
+      assets: doc.assets.map(function (a) { return { id: a.id, file: a.file, z: z[a.layer] }; }),
+      animations: doc.animations.map(function (an, i) {
+        return {
+          animationId: isStr(an.animationId) && an.animationId !== "" ? an.animationId : "aid" + i,
+          type: effectiveType(an),
+          steps: an.steps.map(function (s) {
+            return { id: s.id,
+                     duration: positive(s.duration) ? s.duration : 0,
+                     randomize: s.randomize === undefined ? 0 : s.randomize };
+          })
+        };
+      })
+    };
+  }
+
+  /* --- the timer simulation: a port of the Timer delegate in SpriteLayer.qml.
+     One timer per animation, all started together, each firing once at once
+     (triggeredOnStart). A firing hides the image that timer showed last, shows
+     this step's image, then either stops (last step of a once) or schedules the
+     next firing duration ± randomize later, at least 1 ms. Visibility belongs to
+     the shared images, not to a timer, so two animations using one asset fight
+     over it exactly as they do on the phone. Time is simulated, which makes
+     pause and speed exact; firings that fall between two frames are all
+     processed, in time order, ties in animation order. */
+
+  var sim = { model: null, t: 0, playing: true, speed: 1, random: true,
+              timers: [], vis: [], lastReal: null };
+
+  function assetIndex(id) {
+    for (var i = 0; i < sim.model.assets.length; i++) if (sim.model.assets[i].id === id) return i;
+    return -1;
+  }
+
+  function fire(tm, now) {
+    var anim = tm.anim, step = anim.steps[tm.stepIndex];
+    if (tm.shown !== -1) sim.vis[tm.shown] = false;
+    tm.shown = assetIndex(step.id);
+    sim.vis[tm.shown] = true;
+    tm.shownStep = tm.stepIndex;
+    tm.last = now;
+
+    if (anim.type === "once" && tm.stepIndex === anim.steps.length - 1) {
+      tm.stopped = true;
+      return;
+    }
+    var offset = sim.random ? Math.round((Math.random() * 2 - 1) * step.randomize) : 0;
+    tm.interval = Math.max(1, step.duration + offset);
+    tm.next = now + tm.interval;
+    tm.stepIndex = (tm.stepIndex + 1) % anim.steps.length;
+  }
+
+  function advanceTo(t) {
+    for (var guard = 0; guard < 200000; guard++) {
+      var best = null;
+      for (var i = 0; i < sim.timers.length; i++) {
+        var tm = sim.timers[i];
+        if (!tm.stopped && tm.next <= t && (best === null || tm.next < best.next)) best = tm;
+      }
+      if (best === null) break;
+      fire(best, best.next);
+    }
+    sim.t = t;
+  }
+
+  function restartSim(model) {
+    sim.model = model;
+    sim.t = 0;
+    sim.timers = [];
+    sim.vis = [];
+    if (model) {
+      sim.vis = model.assets.map(function () { return false; });
+      sim.timers = model.animations.map(function (a) {
+        return { anim: a, stepIndex: 0, shown: -1, shownStep: -1, next: 0, last: 0,
+                 interval: 0, stopped: false };
+      });
+      advanceTo(0);
+    }
+    buildStage();
+    buildTimelines();
+    paint();
+  }
+
+  /* --- stage. Geometry follows SpriteLayer.qml: the sprite is 90 % of the
+     screen's height and as wide as its first asset; each image is scaled to that
+     height and pinned at the sprite's top-left; positions as in spriteX() and
+     spriteY(), with the clearance of 0 the engine uses. Equal z falls back to
+     asset order, which is also DOM order here. */
+
+  var imgEls = [], lastVis = [];
+
+  function zRanks(assets) {
+    var zs = [];
+    assets.forEach(function (a) { if (zs.indexOf(a.z) === -1) zs.push(a.z); });
+    zs.sort(function (p, q) { return p - q; });
+    return assets.map(function (a) { return zs.indexOf(a.z) + 1; });
+  }
+
+  function buildStage() {
+    spriteBox.innerHTML = "";
+    imgEls = [];
+    lastVis = [];
+    $("refused").hidden = sim.model !== null;
+    spriteBox.hidden = sim.model === null;
+    if (!sim.model) return;
+
+    var ranks = zRanks(sim.model.assets);
+    var firstAspect = 0.5;
+    var r0 = resolve(sim.model.assets[0].file);
+    if (r0 && r0.entry.ready && r0.entry.h) firstAspect = r0.entry.w / r0.entry.h;
+    spriteBox.style.aspectRatio = String(firstAspect);
+
+    sim.model.assets.forEach(function (a, i) {
+      var r = resolve(a.file), node;
+      if (r) {
+        node = el("img", "so-img");
+        node.src = r.entry.url;
+        node.alt = "";
+      } else {
+        /* No image: a labelled stand-in, half as wide as tall. Each asset's label
+           has its own line, so stand-ins stacked on one spot stay readable. */
+        node = el("div", "so-ph");
+        var lab = el("span", null, a.id);
+        lab.style.top = (6 + i * 20) + "px";
+        node.appendChild(lab);
+      }
+      node.style.zIndex = ranks[i];
+      node.style.visibility = "hidden";
+      spriteBox.appendChild(node);
+      imgEls.push(node);
+      lastVis.push(false);
+    });
+    placeSprite();
+  }
+
+  function positionString() {
+    if (posMode.value !== "custom") return posMode.value;
+    var x = parseFloat(posX.value), y = parseFloat(posY.value);
+    return (isNaN(x) ? 50 : x) + "%," + (isNaN(y) ? 100 : y) + "%";
+  }
+
+  function placeSprite() {
+    var s = spriteBox.style, pos = positionString();
+    s.left = s.right = s.top = s.bottom = "";
+    s.transform = "";
+    if (pos.indexOf("%") !== -1) {
+      var parts = pos.split(",");
+      s.left = parseFloat(parts[0]) + "%";               /* x% of the width, sprite centred on it */
+      s.top  = parseFloat(parts[1]) + "%";               /* y% of the height, sprite's bottom on it */
+      s.transform = "translate(-50%, -100%)";
+    } else {
+      s.bottom = "0";
+      if (pos === "left") s.left = "0";
+      else if (pos === "right") s.right = "0";
+      else { s.left = "50%"; s.transform = "translateX(-50%)"; }
+    }
+    spriteBox.classList.toggle("bounds", $("boundsOn").checked);
+    renderSnippet();
+  }
+
+  /* --- timelines: one bar per animation, step widths in proportion to their
+     nominal duration, the held step of a once a fixed narrow block. The step on
+     screen is lit, with how far along it is filled in. */
+
+  var tlBlocks = [];
+
+  function buildTimelines() {
+    timelines.innerHTML = "";
+    tlBlocks = [];
+    if (!sim.model) return;
+    sim.model.animations.forEach(function (a, i) {
+      var row = el("div", "so-tl");
+      var label = el("div", "so-tl-label");
+      label.appendChild(el("span", "so-tl-name", a.animationId));
+      label.appendChild(el("span", "so-tl-type", a.type));
+      row.appendChild(label);
+
+      var bar = el("div", "so-tl-bar"), blocks = [], total = 0;
+      a.steps.forEach(function (s, j) {
+        if (!(a.type === "once" && j === a.steps.length - 1)) total += s.duration;
+      });
+      a.steps.forEach(function (s, j) {
+        var hold = a.type === "once" && j === a.steps.length - 1;
+        var b = el("div", "so-tl-step" + (hold ? " hold" : ""));
+        b.style.flex = hold ? "0 0 2.6rem" : (total ? s.duration / total : 1) + " 1 0";
+        var fill = el("div", "so-tl-fill");
+        b.appendChild(fill);
+        b.appendChild(el("span", null, s.id + (hold ? " ∞" : "")));
+        b.title = s.id + (hold ? " — held" : " — " + s.duration + " ms" +
+                  (s.randomize ? " ± " + s.randomize : "")) + ". Click to edit.";
+        b.addEventListener("click", function () { focusStep(i, j); });
+        bar.appendChild(b);
+        blocks.push({ el: b, fill: fill });
+      });
+      row.appendChild(bar);
+      timelines.appendChild(row);
+      tlBlocks.push(blocks);
+    });
+  }
+
+  function focusStep(animIndex, stepIndex) {
+    var row = form.querySelector('[data-step="' + animIndex + "-" + stepIndex + '"]');
+    if (!row) return;
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    var sel = row.querySelector("select");
+    if (sel) sel.focus({ preventScroll: true });
+    row.classList.add("flash");
+    setTimeout(function () { row.classList.remove("flash"); }, 900);
+  }
+
+  function paint() {
+    for (var i = 0; i < imgEls.length; i++) {
+      if (sim.vis[i] !== lastVis[i]) {
+        imgEls[i].style.visibility = sim.vis[i] ? "visible" : "hidden";
+        lastVis[i] = sim.vis[i];
+      }
+    }
+    sim.timers.forEach(function (tm, i) {
+      var blocks = tlBlocks[i];
+      if (!blocks) return;
+      blocks.forEach(function (b, j) {
+        var on = j === tm.shownStep, p = 0;
+        b.el.classList.toggle("on", on);
+        if (on) p = tm.stopped ? 1 : Math.min(1, (sim.t - tm.last) / tm.interval);
+        b.fill.style.width = (p * 100) + "%";
+      });
+    });
+    $("clock").textContent = (Math.floor(sim.t / 100) / 10).toFixed(1) + " s";
+  }
+
+  function tick(ts) {
+    if (sim.lastReal === null) sim.lastReal = ts;
+    var dt = Math.min(250, ts - sim.lastReal);      /* a background tab does not jump ahead */
+    sim.lastReal = ts;
+    if (sim.playing && sim.model) {
+      advanceTo(sim.t + dt * sim.speed);
+      paint();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  $("playBtn").addEventListener("click", function () {
+    sim.playing = !sim.playing;
+    this.textContent = sim.playing ? "Pause" : "Play";
+  });
+  $("restartBtn").addEventListener("click", function () { restartSim(sim.model); });
+  $("speed").addEventListener("change", function () { sim.speed = parseFloat(this.value); });
+  $("randomOn").addEventListener("change", function () { sim.random = this.checked; restartSim(sim.model); });
+  $("boundsOn").addEventListener("change", placeSprite);
+
+  /* --- stage settings */
+
+  var deviceSel = $("device");
+  window.DEVICE_PROFILES.forEach(function (p, i) {
+    if (p.custom) return;
+    var o = el("option", null, p.label);
+    o.value = i;
+    deviceSel.appendChild(o);
+  });
+  function applyDevice() {
+    var p = window.DEVICE_PROFILES[parseInt(deviceSel.value, 10)];
+    var w = Math.max(p.width, p.height), h = Math.min(p.width, p.height);
+    frame.style.aspectRatio = w + " / " + h;           /* GameScreen is forced landscape */
+    $("previewMeta").textContent = "Game screen in landscape, " + w + "×" + h + ". The sprite is " +
+      "90 % of the screen's height on every device; only the width of the screen changes.";
+  }
+  deviceSel.addEventListener("change", applyDevice);
+
+  var bgUrl = null;
+  $("bgMode").addEventListener("change", function () {
+    if (this.value === "image") { $("bgInput").click(); return; }
+    applyBg();
+  });
+  $("bgInput").addEventListener("change", function () {
+    var f = this.files[0];
+    if (f) {
+      if (bgUrl) URL.revokeObjectURL(bgUrl);
+      bgUrl = URL.createObjectURL(f);
+    }
+    this.value = "";
+    if (!bgUrl) $("bgMode").value = "gradient";
+    applyBg();
+  });
+  function applyBg() {
+    var mode = $("bgMode").value;
+    stage.className = "so-stage" + (mode === "gradient" ? " preview-bg" : " so-bg-" + mode);
+    /* GameScreen draws backgrounds with PreserveAspectCrop: "cover" in CSS. */
+    stage.style.backgroundImage = mode === "image" && bgUrl ? "url(" + bgUrl + ")" : "";
+  }
+
+  posMode.addEventListener("change", function () {
+    $("customPos").hidden = posMode.value !== "custom";
+    placeSprite();
+  });
+  posX.addEventListener("input", placeSprite);
+  posY.addEventListener("input", placeSprite);
+
+  /* ============================================================== refresh */
+
+  /* Everything that follows an edit: output, notices, summaries, and the preview —
+     which is only rebuilt when the engine's view of the file changed, so typing
+     in a field that does not affect playback leaves the animation running. */
+  var modelKey = null;
+
+  function refresh() {
+    output.textContent = formatDoc(toJson());
+
+    var notes = validate();
+    var errors = notes.filter(function (n) { return n[0] === "err"; }).length;
+    noticeBox.innerHTML = "";
+    if (errors) {
+      var head = el("p", "notice err");
+      head.innerHTML = "<strong>The engine would not show this sprite at all.</strong> It stops at " +
+        "the first " + (errors === 1 ? "problem" : "of these " + errors + " problems") + " and logs it.";
+      noticeBox.appendChild(head);
+    }
+    notes.forEach(function (n) {
+      var p = el("p", "notice" + (n[0] === "info" ? "" : " " + n[0]));
+      p.innerHTML = n[1];
+      noticeBox.appendChild(p);
+    });
+
+    var model = errors ? null : normalize();
+    var key = errors ? "err" : JSON.stringify(model);
+    if (key !== modelKey) {
+      modelKey = key;
+      restartSim(model);
+    }
+
+    for (var i = 0; i < doc.animations.length; i++) {
+      var sum = animList.querySelector('[data-anim-sum="' + i + '"]');
+      if (sum) sum.textContent = cycleText(doc.animations[i]);
+    }
+    $("savePath").textContent = "qml/game/assets/sprites/" + (saveAsEl.value.trim() || "…");
+    renderFixPaths();
+    renderSnippet();
+  }
+
+  /* Gathers the burst of image onload callbacks after a folder load into one redraw. */
+  var refreshPending = false;
+  function scheduleRefresh() {
+    if (refreshPending) return;
+    refreshPending = true;
+    setTimeout(function () {
+      refreshPending = false;
+      renderAssets();          /* thumbnails */
+      modelKey = null;         /* image sizes set the sprite's width */
+      refresh();
+    }, 60);
+  }
+
+  /* --- "Use full paths": assets that matched a loaded image by name or case only */
+  function renderFixPaths() {
+    var n = doc.assets.filter(function (a) { var r = resolve(a.file); return r && r.how !== "exact"; }).length;
+    $("fixPathsRow").hidden = n === 0;
+    $("fixPathsNote").textContent = n + (n === 1 ? " asset matches" : " assets match") +
+      " a loaded image only by name or by case. This writes the loaded path into the file.";
+  }
+  $("fixPaths").addEventListener("click", function () {
+    doc.assets.forEach(function (a) {
+      var r = resolve(a.file);
+      if (r && r.how !== "exact") a.file = r.path;
+    });
+    renderForm();
+  });
+
+  /* --- scene snippet */
+  function defaultSpriteId(name) {
+    return baseName(name).replace(/\.json$/i, "") || "character";
+  }
+  function renderSnippet() {
+    var cmd = { cmd: "sprite", id: spriteIdEl.value.trim() || "character",
+                image: saveAsEl.value.trim() || "character.json", position: positionString() };
+    $("snippet").textContent = "{ " + Object.keys(cmd).map(function (k) {
+      return JSON.stringify(k) + ": " + JSON.stringify(cmd[k]);
+    }).join(", ") + " }";
+  }
+  spriteIdEl.addEventListener("input", renderSnippet);
+  saveAsEl.addEventListener("input", refresh);
+
+  /* ============================================================== loading */
+
+  $("fileInput").addEventListener("change", function () {
+    var f = this.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () { loadText(r.result, f.name); };
+    r.readAsText(f);
+    this.value = "";
+  });
+
+  $("folderInput").addEventListener("change", function () {
+    if (this.files.length) loadFolder(this.files);
+    this.value = "";
+  });
+
+  $("openJson").addEventListener("change", function () {
+    var path = this.value, f = library.jsonFiles[path];
+    this.value = "";
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () { loadText(r.result, path); };
+    r.readAsText(f);
+  });
+
+  /* Images added one by one. If a loaded folder holds exactly one image of that
+     name, its full path is used and the file is not stored twice; otherwise the
+     bare file name is the path, ready to be corrected. With makeAssets, each image
+     also becomes an asset on the last layer. */
+  function addPickedImages(files, makeAssets) {
+    var list = Array.prototype.slice.call(files).filter(function (f) { return IMAGE_EXT[extOf(f.name)] === true; });
+    list.sort(function (p, q) { return p.name < q.name ? -1 : p.name > q.name ? 1 : 0; });
+    if (!list.length) return;
+    if (makeAssets && !doc.layers.length) doc.layers.push({ id: "main", z: 0, _extra: {} });
+    var layerIds = idsOf(doc.layers);
+    list.forEach(function (f) {
+      var path = f.name;
+      var hits = Object.keys(library.byPath).filter(function (p) { return baseName(p) === f.name; });
+      if (hits.length === 1 && hits[0] !== f.name) path = hits[0];
+      else {
+        if (!library.byPath[f.name]) library.picked++;
+        libAdd(f.name, f);
+      }
+      if (makeAssets) {
+        var id = uniqueId(f.name.replace(/\.[^.]+$/, "").replace(/\s+/g, "_"), doc.assets);
+        doc.assets.push({ id: id, layer: layerIds[layerIds.length - 1], file: path, _extra: {} });
+      }
+    });
+    renderForm();
+  }
+
+  $("imagesInput").addEventListener("change", function () {
+    addPickedImages(this.files, true);
+    this.value = "";
+  });
+
+  $("clearImages").addEventListener("click", function () {
+    libClear();
+    renderForm();
+  });
+
+  /* Dropping: the first .json is opened; images join the preview library without
+     becoming assets, since the file dropped with them already names them. */
+  var dz = $("dropZone");
+  ["dragenter", "dragover"].forEach(function (ev) {
+    dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove("over"); });
+  });
+  dz.addEventListener("drop", function (e) {
+    var files = Array.prototype.slice.call(e.dataTransfer.files);
+    var json = files.filter(function (f) { return extOf(f.name) === "json"; })[0];
+    var images = files.filter(function (f) { return IMAGE_EXT[extOf(f.name)] === true; });
+    if (images.length) addPickedImages(images, false);
+    if (json) {
+      var r = new FileReader();
+      r.onload = function () { loadText(r.result, json.name); };
+      r.readAsText(json);
+    }
+  });
+
+  $("resetBtn").addEventListener("click", function () {
+    if (!confirm("Start over with a fresh sprite object? Loaded images are kept.")) return;
+    doc = starterDoc();
+    loadNotes = [];
+    saveAsEl.value = "character.json";
+    spriteIdEl.value = "character";
+    renderForm();
+  });
+
+  /* ================================================================ output */
+
+  $("copyBtn").addEventListener("click", function () { T.copy(output.textContent, this); });
+  $("downloadBtn").addEventListener("click", function () {
+    var name = baseName(saveAsEl.value.trim()) || "character.json";
+    if (!/\.json$/i.test(name)) name += ".json";
+    T.download(output.textContent, name);
+  });
+  $("copySnippet").addEventListener("click", function () { T.copy($("snippet").textContent, this); });
+
+  /* ================================================================== boot */
+
+  applyDevice();
+  applyBg();
+  renderForm();
+  requestAnimationFrame(tick);
+
+  /* For testing from the console. */
+  window.SpriteObjectEditor = {
+    load: loadText,
+    json: function () { return output.textContent; },
+    notices: validate,
+    sim: sim,
+    advance: function (t) { advanceTo(t); paint(); }
+  };
+})();
+</script>
 </body>
 </html>
