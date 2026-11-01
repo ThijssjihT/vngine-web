@@ -94,7 +94,7 @@
         itself contains a colon), and with <code>//</code> for a comment the tool throws away.</p>
         <p class="hint">Lines starting with <code>@</code> are commands:
         <code>@label name</code>, <code>@jump name</code>, <code>@scene scene_0002</code>,
-        <code>@bg bg/room.png</code>, <code>@sprite liisa sprites/liisa_1.png center</code>,
+        <code>@bg bg/room.png</code>, <code>@sprite liisa liisaBlink.json center</code>,
         <code>@remove liisa</code>, <code>@set panic add 6</code>,
         <code>@style textbox colorful_textbox</code>, <code>@wait 500</code>, <code>@end</code>.
         Choices and conditional jumps are not in the shorthand — build those in the form, where the
@@ -165,7 +165,7 @@
 <datalist id="dlScene"></datalist>
 <datalist id="dlSpeaker"></datalist>
 <datalist id="dlSprite"></datalist>
-<datalist id="dlLoop"></datalist>
+<datalist id="dlChannel"></datalist>
 
 <script src="../assets/js/sitemap.js"></script>
 <script src="../assets/js/nav.js"></script>
@@ -244,7 +244,6 @@
     if (opts.list)        i.setAttribute("list", opts.list);
     if (opts.placeholder) i.placeholder = opts.placeholder;
     if (opts.min !== undefined)  i.min  = opts.min;
-    if (opts.max !== undefined)  i.max  = opts.max;
     if (opts.step !== undefined) i.step = opts.step;
     i.addEventListener("input", function () { oninput(i.value, i); });
     return i;
@@ -287,128 +286,6 @@
   var siblings = Object.create(null);   /* sceneId -> { labels: [], file: "" } */
   var selected = -1;
   var compact  = false;
-
-  /* ---------------------------------------------------------- audio helpers */
-  /*
-     audio_bg and audio_loop both take an `action`, and the action decides which
-     other keys mean anything — mirroring handleAudioBgAction() and
-     handleAudioLoopAction() in AudioController.qml. AUDIO_KEYS lists those keys
-     per action, in the order they are written out. A key the loaded action does
-     not read goes to _extra untouched, so a round trip never loses it and the
-     "kept" notice still reports it.
-
-     The editor stores every value as a string, with "" meaning "leave the key
-     out of the file". That keeps a missing key and a zero apart, which matters
-     here: a missing fadeTime and fadeTime 0 are both instant, but only one of
-     them was written by the author.
-  */
-  var AUDIO_KEYS = {
-    audio_bg: {
-      setMusic:  ["tracks", "loop", "transition", "fadeTime", "volume"],
-      setVolume: ["volume", "fadeTime"],
-      stop:      ["fadeTime"],
-      pause:     [],
-      resume:    []
-    },
-    audio_fx: {
-      "":        ["file", "volume"]
-    },
-    audio_loop: {
-      start:     ["id", "file", "volume", "fadeTime"],
-      stop:      ["id", "fadeTime"],
-      stopAll:   ["fadeTime"]
-    }
-  };
-
-  /* The channel each command reads its volume slider from. These names are
-     fixed in AudioController.qml, not taken from the manifest. */
-  var AUDIO_CHANNEL = { audio_bg: "music", audio_fx: "game_fx", audio_loop: "looping_fx" };
-
-  function audioUsed(cmdName, action) {
-    var table = AUDIO_KEYS[cmdName];
-    return Object.prototype.hasOwnProperty.call(table, action) ? table[action] : [];
-  }
-
-  /* Reads the keys `used` from a loaded command into string fields. A value of a
-     type the engine cannot use stays out of `known`, so takeExtras keeps it. */
-  function audioFrom(cmdName, c, action) {
-    var used  = audioUsed(cmdName, action);
-    var e     = { cmd: cmdName, action: action, tracks: "", loop: "", transition: "",
-                  fadeTime: "", volume: "", id: "", file: "" };
-    var known = ["cmd", "action"];
-    used.forEach(function (k) {
-      var v = c[k];
-      if (v === undefined) { known.push(k); return; }
-      if (k === "tracks" && Array.isArray(v) &&
-          v.every(function (t) { return typeof t === "string"; })) {
-        e.tracks = v.join("\n");
-        known.push(k);
-      } else if (k === "tracks" && typeof v === "string") {
-        /* a bare string would be indexed character by character by the engine */
-        e.tracks = v;
-        e._note  = "Loaded with <code>tracks</code> as a single string and rewritten as a " +
-          "list. The engine indexes <code>tracks</code> like an array, so a string plays " +
-          "one letter of the path at a time.";
-        known.push(k);
-      } else if ((k === "fadeTime" || k === "volume") && typeof v === "number") {
-        e[k] = String(v);
-        known.push(k);
-      } else if (k === "loop" && typeof v === "boolean") {
-        e.loop = String(v);
-        known.push(k);
-      } else if ((k === "transition" || k === "id" || k === "file") && typeof v === "string") {
-        e[k] = v;
-        known.push(k);
-      }
-    });
-    e._extra = takeExtras(c, known);
-    return e;
-  }
-
-  /* Writes only the keys the current action reads. tracks is always written for
-     setMusic — an empty list is still the right shape, and the notices flag it. */
-  function audioTo(e) {
-    var o = { cmd: e.cmd };
-    if (e.cmd !== "audio_fx" && e.action !== "") o.action = e.action;
-    audioUsed(e.cmd, e.cmd === "audio_fx" ? "" : e.action).forEach(function (k) {
-      if (k === "tracks") {
-        if (e.tracks.trim() || !(e._extra && e._extra.tracks !== undefined))
-          o.tracks = audioTracks(e);
-      } else if (k === "fadeTime" || k === "volume") {
-        var n = parseFloat(e[k]);
-        if (e[k] !== "" && !isNaN(n)) o[k] = n;
-      } else if (k === "loop") {
-        if (e.loop !== "") o.loop = e.loop === "true";
-      } else if (e[k] !== "") {
-        o[k] = e[k];
-      }
-    });
-    return withExtras(o, e);
-  }
-
-  function audioTracks(e) {
-    return e.tracks.split("\n").map(function (t) { return t.trim(); })
-                   .filter(function (t) { return t !== ""; });
-  }
-
-  /* The action picker. An action the engine does not know is shown as itself
-     rather than silently snapping to the first option. */
-  function audioActionPicker(e, labels) {
-    var opts = labels.slice();
-    var listed = opts.some(function (o) { return o[0] === e.action; });
-    if (!listed) opts.unshift([e.action, e.action === "" ? "(no action)" : e.action + " (unknown)"]);
-    return cell("action", select(opts, e.action, function (v) { e.action = v; redraw(); }));
-  }
-
-  /* A number cell whose blank means "leave it out". */
-  function audioNumber(e, key, caption, placeholder, max, step) {
-    return cell(caption, input(e[key], function (v) { e[key] = v; touch(); },
-      { type: "number", min: 0, max: max, step: step, placeholder: placeholder }));
-  }
-
-  function audioVolumeCell(e) {
-    return audioNumber(e, "volume", "volume, 0–1", "1", 1, 0.05);
-  }
 
   /* --------------------------------------------------------- command specs */
   /*
@@ -499,9 +376,15 @@
         box.appendChild(cell("id", input(e.id, function (v) { e.id = v; touch(); },
           { spell: false, placeholder: "liisa" })));
         box.appendChild(cell("image", input(e.image, function (v) { e.image = v; touch(); },
-          { spell: false, placeholder: "sprites/liisa_1.png" })));
+          { spell: false, placeholder: "liisaBlink.json" })));
         box.appendChild(cell("position", input(e.position, function (v) { e.position = v; touch(); },
           { spell: false, placeholder: "left | center | right | 60%,0" })));
+        note(box, "<code>image</code> is a plain picture (<code>.png</code>, <code>.jpg</code>, " +
+          "<code>.jpeg</code>) or an animated sprite object (<code>.json</code>, made with the " +
+          "<a href=\"sprite-object.html\">sprite object editor</a>). The engine puts " +
+          "<code>assets/sprites/</code> in front itself, so <code>liisaBlink.json</code> means " +
+          "<code>assets/sprites/liisaBlink.json</code>. A sprite object starts all of its " +
+          "animations as soon as it is shown; this command has no way to pick one.");
         note(box, "Re-using an id replaces that sprite instead of adding a second one. " +
           "A pair like <code>60%,0</code> places the sprite's horizontal centre by hand.");
       }
@@ -691,143 +574,45 @@
     },
 
     audio_bg: {
-      title: "audio_bg", group: "audio", impl: true,
-      make: function () { return audioFrom("audio_bg", {}, "setMusic"); },
+      title: "audio_bg", group: "audio", impl: false,
+      make: function () { return { cmd: "audio_bg", file: "", _stop: false }; },
       from: function (c) {
-        if (c.action === undefined && c.file !== undefined) {
-          /* the shape older drafts of the design document used, and this
-             generator wrote: a single `file`, or null to stop */
-          var old = takeExtras(c, ["file"]);
-          old.action = c.file === null ? "stop" : "setMusic";
-          if (c.file !== null) old.tracks = [str(c.file)];
-          var e = audioFrom("audio_bg", old, old.action);
-          e._note = "Loaded in the old <code>\"file\"</code> shape and rewritten as " +
-            (c.file === null ? "<code>\"action\": \"stop\"</code>"
-                             : "<code>\"action\": \"setMusic\"</code> with a one-track list") +
-            ". The engine has no case for <code>file</code> without an action.";
-          return e;
-        }
-        return audioFrom("audio_bg", c, str(c.action));
+        return { cmd: "audio_bg", file: c.file === null ? "" : str(c.file), _stop: c.file === null,
+                 _extra: takeExtras(c, ["cmd", "file"]) };
       },
-      to: audioTo,
-      summary: function (e) {
-        if (e.action === "setMusic") {
-          var t = audioTracks(e);
-          return "setMusic — " + (t.length ? t.join(", ") : "(no tracks)");
-        }
-        if (e.action === "setVolume") return "setVolume → " + (e.volume || "?");
-        return e.action || "(no action)";
+      to: function (e) {
+        return withExtras({ cmd: "audio_bg", file: e._stop ? null : e.file }, e);
       },
-      body: function (e, box) {
-        box.className = "cmd-body auto";
-        box.appendChild(audioActionPicker(e, [["setMusic", "setMusic"], ["setVolume", "setVolume"],
-          ["stop", "stop"], ["pause", "pause"], ["resume", "resume"]]));
-        var used = audioUsed("audio_bg", e.action);
-
-        if (used.indexOf("loop") !== -1)
-          box.appendChild(cell("loop", select([["", "yes (default)"], ["true", "yes"], ["false", "no"]],
-            e.loop, function (v) { e.loop = v; touch(); })));
-        if (used.indexOf("transition") !== -1) {
-          var tr = [["", "crossfade (default)"], ["crossfade", "crossfade"], ["cut", "cut"]];
-          if (e.transition && e.transition !== "crossfade" && e.transition !== "cut")
-            tr.push([e.transition, e.transition + " (= crossfade)"]);
-          box.appendChild(cell("transition", select(tr, e.transition,
-            function (v) { e.transition = v; redraw(); })));
-        }
-        if (used.indexOf("fadeTime") !== -1)
-          box.appendChild(audioNumber(e, "fadeTime", "fadeTime, ms",
-            e.action === "setMusic" ? "800" : "0", undefined, 100));
-        if (used.indexOf("volume") !== -1)
-          box.appendChild(audioVolumeCell(e));
-        if (used.indexOf("tracks") !== -1) {
-          var t = area(e.tracks, function (v) { e.tracks = v; touch(); }, 2);
-          t.spellcheck = false;
-          t.placeholder = "music/theme.ogg";
-          box.appendChild(cell("tracks — one per line, relative to assets/audio/", t, "span"));
-        }
-
-        if (e.action === "setMusic") note(box, "Plays the tracks back to back and, unless loop " +
-          "is off, starts again from the top. A crossfade fades the old music out and the new in " +
-          "over fadeTime (800 ms if left out); <code>cut</code> swaps at once and ignores " +
-          "fadeTime. volume multiplies the player's Music slider.");
-        else if (e.action === "setVolume") note(box, "Fades the music to volume — a multiplier " +
-          "on the player's Music slider — over fadeTime, or at once if fadeTime is left out.");
-        else if (e.action === "stop") note(box, "Fades the music out over fadeTime and clears " +
-          "the track list. Instant if fadeTime is left out.");
-        else if (e.action === "pause") note(box, "Pauses the current track where it is, " +
-          "without a fade. <code>resume</code> carries on from the same spot.");
-        else if (e.action === "resume") note(box, "Carries on with a paused track, without a fade.");
-        if (e._note) note(box, e._note, true);
-      }
-    },
-
-    audio_fx: {
-      title: "audio_fx", group: "audio", impl: true,
-      make: function () { return audioFrom("audio_fx", {}, ""); },
-      from: function (c) { return audioFrom("audio_fx", c, ""); },
-      to: audioTo,
-      summary: function (e) { return (e.file || "(no file)") + (e.volume !== "" ? " @ " + e.volume : ""); },
+      summary: function (e) { return e._stop ? "stop music" : (e.file || "(no file)"); },
       body: function (e, box) {
         box.className = "cmd-body two";
-        box.appendChild(cell("file, relative to assets/audio/", input(e.file,
-          function (v) { e.file = v; touch(); }, { spell: false, placeholder: "sfx/boink.ogg" })));
-        box.appendChild(audioVolumeCell(e));
-        note(box, "A one-shot sound on the game_fx channel; volume multiplies the player's " +
-          "slider for it. Up to four play at once and a fifth is skipped with a warning in the " +
-          "log, so anything long or repeating belongs in <code>audio_loop</code>.");
-        if (e._note) note(box, e._note, true);
+        box.appendChild(cell("file", input(e.file, function (v) { e.file = v; touch(); },
+          { spell: false, placeholder: "audio/music/theme.mp3" })));
+        var c = elt("label", "check");
+        var cb = elt("input"); cb.type = "checkbox"; cb.checked = e._stop;
+        cb.addEventListener("change", function () { e._stop = cb.checked; redraw(); });
+        c.appendChild(cb); c.appendChild(document.createTextNode(" stop the music (writes null)"));
+        box.appendChild(cell("or", c));
       }
     },
 
-    /* A load-time alias only. audio_sfx is the name this generator and the
-       design document used before the engine settled on audio_fx; it is not in
-       CMD_ORDER, so it never shows in the palette, and the entry it returns is an
-       audio_fx, so nothing downstream ever sees this spec again. */
     audio_sfx: {
-      title: "audio_sfx", group: "audio", impl: true,
-      make: function () { return SPECS.audio_fx.make(); },
+      title: "audio_sfx", group: "audio", impl: false,
+      make: function () { return { cmd: "audio_sfx", file: "", channel: "game_fx" }; },
       from: function (c) {
-        var e = audioFrom("audio_fx", takeExtras(c, ["cmd", "channel"]), "");
-        e._note = "Loaded as <code>audio_sfx</code> and rewritten as <code>audio_fx</code>, " +
-          "the name the engine runs" + (c.channel !== undefined ? ". Its <code>channel</code> " +
-          "key was dropped — <code>audio_fx</code> always plays on game_fx" : "") + ".";
-        return e;
-      }
-    },
-
-    audio_loop: {
-      title: "audio_loop", group: "audio", impl: true,
-      make: function () { return audioFrom("audio_loop", {}, "start"); },
-      from: function (c) { return audioFrom("audio_loop", c, str(c.action)); },
-      to: audioTo,
-      summary: function (e) {
-        if (e.action === "start") return "start " + (e.id || "?") + " — " + (e.file || "(no file)");
-        if (e.action === "stop")  return "stop " + (e.id || "?");
-        return e.action || "(no action)";
+        return { cmd: "audio_sfx", file: str(c.file), channel: str(c.channel) || "game_fx",
+                 _extra: takeExtras(c, ["cmd", "file", "channel"]) };
       },
+      to: function (e) {
+        return withExtras({ cmd: "audio_sfx", file: e.file, channel: e.channel }, e);
+      },
+      summary: function (e) { return (e.file || "(no file)") + " on " + e.channel; },
       body: function (e, box) {
-        box.className = "cmd-body auto";
-        box.appendChild(audioActionPicker(e, [["start", "start"], ["stop", "stop"], ["stopAll", "stopAll"]]));
-        var used = audioUsed("audio_loop", e.action);
-        if (used.indexOf("id") !== -1)
-          box.appendChild(cell("id", input(e.id, function (v) { e.id = v; touch(); },
-            { spell: false, list: "dlLoop", placeholder: "rain" })));
-        if (used.indexOf("volume") !== -1)
-          box.appendChild(audioVolumeCell(e));
-        if (used.indexOf("fadeTime") !== -1)
-          box.appendChild(audioNumber(e, "fadeTime", "fadeTime, ms", "0", undefined, 100));
-        if (used.indexOf("file") !== -1)
-          box.appendChild(cell("file, relative to assets/audio/", input(e.file,
-            function (v) { e.file = v; touch(); }, { spell: false, placeholder: "sfx/rain.ogg" }), "span"));
-
-        if (e.action === "start") note(box, "Loops the file until it is stopped, fading in over " +
-          "fadeTime (instant if left out), on the looping_fx channel. Starting an id that is " +
-          "already playing the same file only changes its volume; a different file replaces it. " +
-          "Up to four loops at once.");
-        else if (e.action === "stop") note(box, "Fades out the loop with this id. Instant if " +
-          "fadeTime is left out.");
-        else if (e.action === "stopAll") note(box, "Fades out every running loop. Instant if " +
-          "fadeTime is left out.");
+        box.className = "cmd-body two";
+        box.appendChild(cell("file", input(e.file, function (v) { e.file = v; touch(); },
+          { spell: false, placeholder: "audio/sfx/boink.ogg" })));
+        box.appendChild(cell("channel", input(e.channel, function (v) { e.channel = v; touch(); },
+          { spell: false, list: "dlChannel" })));
       }
     },
 
@@ -842,9 +627,7 @@
       body: function (e, box) {
         box.className = "cmd-body one";
         box.appendChild(cell("file", input(e.file, function (v) { e.file = v; touch(); },
-          { spell: false, placeholder: "voice/liisa_0001.ogg" })));
-        note(box, "Planned. The voice channel is designed but not built, and this command's " +
-          "shape is a placeholder that may still change.", true);
+          { spell: false, placeholder: "audio/voice/liisa_0001.ogg" })));
       }
     },
 
@@ -919,7 +702,7 @@
   };
 
   var CMD_ORDER = ["say", "bg", "sprite", "sprite_remove", "set", "label", "jump", "jump_if",
-                   "choice", "style", "show_hud", "audio_bg", "audio_fx", "audio_loop", "audio_voice",
+                   "choice", "style", "show_hud", "audio_bg", "audio_sfx", "audio_voice",
                    "wait", "end"];
 
   /* Commands that stop the run loop and wait for the player. */
@@ -1791,80 +1574,6 @@
 
   function pushNote(list, level, html, at) { list.push({ level: level, html: html, at: at }); }
 
-  /* Audio checks, against AudioController.qml as it stands. Each one names what
-     the engine does with the mistake, since most of them fail with nothing more
-     than a line in the log — or, for an unknown audio_loop action, not even that. */
-  function checkAudio(c, i, out) {
-    var hasAction = c.cmd !== "audio_fx";
-    var action    = hasAction ? c.action : "";
-    var used      = audioUsed(c.cmd, action);
-
-    if (hasAction && !Object.prototype.hasOwnProperty.call(AUDIO_KEYS[c.cmd], action)) {
-      var what = action === "" ? "No <code>action</code>" :
-                 "The action <code>" + esc(action) + "</code> is not one the engine knows";
-      pushNote(out, "err", what + (c.cmd === "audio_bg"
-        ? ". The engine logs it as not implemented and the music does not change."
-        : ". <code>handleAudioLoopAction()</code> has no default branch, so the command does " +
-          "nothing at all — not even a warning in the log."), i);
-      return;
-    }
-
-    if (c.cmd === "audio_bg" && action === "setMusic") {
-      if (!audioTracks(c).length)
-        pushNote(out, "err", "<code>setMusic</code> with no tracks. The engine logs it and the " +
-          "music that was playing carries on.", i);
-      if (c.transition && c.transition !== "crossfade" && c.transition !== "cut")
-        pushNote(out, "info", "Transition <code>" + esc(c.transition) + "</code> — the engine " +
-          "only tests for <code>cut</code>, so any other value crossfades.", i);
-      if (c.transition === "cut" && c.fadeTime !== "")
-        pushNote(out, "info", "A <code>cut</code> ignores fadeTime.", i);
-    }
-    if (c.cmd === "audio_bg" && action === "setVolume" && c.volume === "")
-      pushNote(out, "warn", "<code>setVolume</code> with no volume. The engine reads that as " +
-        "1, so the music goes to the full level of the player's slider.", i);
-
-    if (c.cmd === "audio_fx" && !c.file.trim())
-      pushNote(out, "err", "No file. The engine logs it and plays nothing.", i);
-
-    if (c.cmd === "audio_loop" && action === "start") {
-      if (!c.file.trim())
-        pushNote(out, "err", "No file. The engine logs it and starts nothing.", i);
-      if (!c.id.trim())
-        pushNote(out, "warn", "No id. The loop plays, but <code>stop</code> finds loops by id, " +
-          "so only <code>stopAll</code> can end it.", i);
-    }
-    if (c.cmd === "audio_loop" && action === "stop" && !c.id.trim())
-      pushNote(out, "err", "<code>stop</code> with no id. The engine finds no loop to stop and " +
-        "logs it.", i);
-
-    if (used.indexOf("volume") !== -1 && c.volume !== "") {
-      var v = parseFloat(c.volume);
-      if (!isNaN(v) && (v < 0 || v > 1))
-        pushNote(out, "warn", "volume " + esc(c.volume) + " is outside 0–1. It multiplies the " +
-          "player's slider for this channel, and the engine does not clamp it.", i);
-    }
-    if (used.indexOf("fadeTime") !== -1 && parseFloat(c.fadeTime) < 0)
-      pushNote(out, "warn", "A negative fadeTime.", i);
-
-    var paths = used.indexOf("tracks") !== -1 ? audioTracks(c) : [];
-    if (used.indexOf("file") !== -1 && c.file.trim()) paths.push(c.file.trim());
-    paths.forEach(function (p) {
-      if (p.charAt(0) === "/" || p.indexOf("assets/") === 0 || p.indexOf("audio/") === 0)
-        pushNote(out, "warn", "<code>" + esc(p) + "</code> — audio paths are relative to " +
-          "<code>assets/audio/</code>, which the engine adds itself, so this looks for " +
-          "<code>assets/audio/" + esc(p) + "</code>.", i);
-    });
-
-    /* Only the actions that compute a volume read the channel's setting. */
-    var readsVolume = c.cmd === "audio_fx" || action === "setMusic" ||
-                      action === "setVolume" || action === "start";
-    var channel = AUDIO_CHANNEL[c.cmd];
-    if (readsVolume && manifest && manifest.channels.indexOf(channel) === -1)
-      pushNote(out, "warn", "The manifest declares no <code>" + channel + "</code> audio " +
-        "channel, which is where this command takes the player's volume from. The setting " +
-        "lookup fails (\"Unknown setting\" in the log) and the computed volume is not a number.", i);
-  }
-
   function checkNotices(g) {
     var out = [];
     var declaredVars = manifest ? manifest.vars : null;
@@ -2005,14 +1714,31 @@
         if (p && ["left", "right", "center", "centre"].indexOf(p) === -1 && p.indexOf("%") === -1)
           pushNote(out, "info", "Position <code>" + esc(p) + "</code> is not one of " +
             "left/right/center and has no percent sign, so the engine centres the sprite.", i);
+
+        /* Mirrors beginSpritePipeline() in GameEngine.js: the path guard and the extension
+           check both make the engine refuse the sprite, so they are errors, not warnings.
+           Checked on the raw value — the engine does not trim. */
+        var img = c.image;
+        if (img.trim()) {
+          var dot = img.lastIndexOf(".");
+          var ext = dot <= 0 ? "" : img.substring(dot + 1).toLowerCase();
+          if (img.indexOf("..") !== -1 || img.charAt(0) === "/" || img.indexOf("\\") !== -1)
+            pushNote(out, "err", "Sprite image <code>" + esc(img) + "</code> is refused by the " +
+              "engine: the path must be relative to <code>assets/sprites/</code>, without " +
+              "<code>..</code>, a leading <code>/</code> or a backslash.", i);
+          else if (["png", "jpg", "jpeg", "json"].indexOf(ext) === -1)
+            pushNote(out, "err", "Sprite image <code>" + esc(img) + "</code> is refused by the " +
+              "engine: it expects <code>.png</code>, <code>.jpg</code>, <code>.jpeg</code> " +
+              "or a <code>.json</code> sprite object.", i);
+          else if (img.indexOf("sprites/") === 0 || img.indexOf("assets/") === 0)
+            pushNote(out, "warn", "<code>" + esc(img) + "</code> — sprite paths are relative to " +
+              "<code>assets/sprites/</code>, which the engine adds itself, so this looks in " +
+              "<code>assets/sprites/" + esc(img) + "</code>.", i);
+        }
       }
 
-      if (AUDIO_CHANNEL[c.cmd]) checkAudio(c, i, out);
-
-      if (c._note) pushNote(out, "info", c._note, i);
-
       ["image", "file"].forEach(function (k) {
-        if (AUDIO_CHANNEL[c.cmd]) return;   /* checkAudio: those resolve under assets/audio/ */
+        if (c.cmd === "sprite" && k === "image") return;   /* own rules above */
         var v = str(c[k]).trim();
         if (!v) return;
         if (v.charAt(0) === "/" || v.indexOf("assets/") === 0)
@@ -2213,7 +1939,7 @@
      for — always shows: a command the tool cannot read for you is exactly the
      thing a reader should be told about rather than quietly shown nothing. */
   var QUIET = { set: 1, style: 1, show_hud: 1, bg: 1, sprite: 1, sprite_remove: 1,
-                wait: 1, audio_bg: 1, audio_fx: 1, audio_loop: 1, audio_voice: 1 };
+                wait: 1, audio_bg: 1, audio_sfx: 1, audio_voice: 1 };
 
   /* every block reachable from n, n itself included. Externals are not blocks
      and drop out here, which is what makes them dead ends for the walk. */
@@ -2561,7 +2287,7 @@
   }
 
   function refreshLists() {
-    var vars = [], settings = [], labels = [], scenes = [], sprites = [], loops = [];
+    var vars = [], settings = [], labels = [], scenes = [], sprites = [];
     if (manifest) {
       vars = Object.keys(manifest.vars);
       settings = Object.keys(manifest.settings);
@@ -2570,7 +2296,6 @@
       if (c.cmd === "set" && c["var"]) vars.push(c["var"]);
       if (c.cmd === "label" && c.label) labels.push(c.label);
       if (c.cmd === "sprite" && c.id) sprites.push(c.id);
-      if (c.cmd === "audio_loop" && c.action === "start" && c.id) loops.push(c.id);
       if (c.cmd === "choice") c.options.forEach(function (o) {
         o.effects.forEach(function (fx) { if (fx["var"]) vars.push(fx["var"]); });
       });
@@ -2589,7 +2314,6 @@
     fillList("dlLabel", labels);
     fillList("dlScene", scenes);
     fillList("dlSprite", sprites);
-    fillList("dlLoop", loops);
   }
 
   /* ---------------------------------------------------------------- render */
@@ -2683,6 +2407,7 @@
       });
     });
     var channels = T.isPlainObject(data.audio_channels) ? Object.keys(data.audio_channels) : [];
+    fillList("dlChannel", channels);
     manifest = { title: str(data.title) || "game.json", vars: vars, settings: settings,
                  entry: str(data.entry_scene), channels: channels };
     render();
