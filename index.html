@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VNgine — a visual novel engine for SailfishOS</title>
-<link rel="stylesheet" href="assets/css/site.css">
+<link rel="stylesheet" href="assets/css/site.css?v=3">
 <script>window.SITE_BASE = "";</script>
 </head>
 <body>
@@ -25,28 +25,135 @@
 
   <div class="todo"><strong>TODO</strong> — home page copy: elevator pitch, screenshots, download links.</div>
 
-  <h2>Screenshots</h2>
-  <p>Captures from development builds — the engine and games are still in progress.</p>
-  <div class="mosaic">
-    <figure class="mosaic-item wide">
+  <h2>One engine, many looks</h2>
+  <p>The textbox and choices are styled from small JSON files. A style file only names what
+  it changes; everything else comes from the engine defaults. Three games, three looks, no
+  engine code touched. Captures are from development builds.</p>
+  <div class="mosaic mosaic-styles">
+
+    <figure class="tile tile-shot is-w1">
       <img src="assets/img/textbox-choice-screenshot.png"
-           alt="A dialogue scene from Wedding Plans showing the textbox and a set of choices over a café background"
+           alt="A café scene from Wedding Plans in Emily's style: choice bars and a textbox in dark brown with copper borders"
            width="2272" height="1032" loading="lazy">
-      <figcaption>A dialogue scene mid-playthrough, with textbox and choices. The HUD is not
-      implemented yet. Taken from a development version of Wedding Plans; it does not
-      represent the final release.</figcaption>
     </figure>
-    <figure class="mosaic-item">
+    <figure class="tile tile-shot is-w2">
+      <img src="assets/img/textbox2-screenshot.png"
+           alt="The same café scene in Thijs's style: a dark slate textbox with a steel-blue border"
+           width="2272" height="1032" loading="lazy">
+    </figure>
+    <div class="tile tile-text is-wc">
+      <span class="tile-label">WEDDING PLANS · one style per character</span>
+      <p>A base file sets the shape; each character inherits it through <code>base</code> and
+      changes two colours. Emily above, Thijs below; choices work the same way. In development:
+      not the final release, no HUD yet.</p>
+      <pre><code>// textbox_base.json
+{
+  "style": {
+    "margins": { "left": 16, "right": 16,
+                 "top": 16, "bottom": 16 },
+    "background": { "color": "#101010",
+                    "opacity": 0.7 },
+    "border": { "width": 2,
+                "color": "#909090",
+                "opacity": 1 },
+    "radius": 12
+  }
+}
+
+// textbox_emily.json
+{
+  "base": "textbox_base",
+  "style": {
+    "background": { "color": "#2A1A16" },
+    "border": { "color": "#C98A5E" }
+  }
+}
+
+// textbox_thijs.json
+{
+  "base": "textbox_base",
+  "style": {
+    "background": { "color": "#141B24" },
+    "border": { "color": "#6E8FB8" }
+  }
+}</code></pre>
+    </div>
+
+    <div class="tile tile-text is-c2">
+      <span class="tile-label">SAMPLE GAME</span>
+      <p>Switched mid-scene with the <code>style</code> command. The textbox file changes one
+      colour; the choice file restyles the whole menu.</p>
+      <pre><code>// colorful_textbox.json
+{ "style": { "background": { "color": "#3050C0",
+                             "opacity": 0.7 } } }
+
+// flashy_choice.json
+{
+  "style": {
+    "grid": {
+      "spacing": 12,
+      "width": 0.7,
+      "padding": { "left": 20, "right": 20,
+                   "top": 20, "bottom": 20 },
+      "background": { "color": "#2A0018",
+                      "opacity": 0.55 },
+      "border": { "width": 3, "color": "#FFC83C",
+                  "opacity": 1 },
+      "radius": 24
+    },
+    "option": {
+      "padding": { "left": 24, "right": 24,
+                   "top": 18, "bottom": 18 },
+      "background": { "color": "#FF3D9A",
+                      "opacity": 0.85 },
+      "border": { "width": 2, "color": "#FFD972",
+                  "opacity": 1 },
+      "radius": 16,
+      "text": { "color": "#FFF3C4" }
+    }
+  }
+}</code></pre>
+    </div>
+    <figure class="tile tile-shot is-s2">
+      <!-- swap for: <img src="assets/img/style-flashy-screenshot.png" alt="…" width="2272" height="1032" loading="lazy"> -->
+      <div class="tile-placeholder">style-flashy-screenshot.png<br>2272 × 1032</div>
+    </figure>
+
+    <figure class="tile tile-shot is-s3">
+      <!-- swap for: <img src="assets/img/style-default-screenshot.png" alt="…" width="2272" height="1032" loading="lazy"> -->
+      <div class="tile-placeholder">style-default-screenshot.png</div>
+    </figure>
+    <div class="tile tile-text is-c3">
+      <span class="tile-label">ENGINE DEFAULTS</span>
+      <p>No style file at all: the look every game starts from.</p>
+    </div>
+
+  </div>
+
+  <h2>At home on Sailfish</h2>
+  <div class="mosaic mosaic-system">
+    <figure class="tile tile-shot is-settings">
       <img src="assets/img/settings-screenshot.png"
-           alt="The settings page, built from the game manifest"
+           alt="The settings page: text speed, auto-advance, audio sliders and game-specific name fields"
            width="1032" height="2272" loading="lazy">
-      <figcaption>Settings, built from the manifest.</figcaption>
     </figure>
-    <figure class="mosaic-item">
+    <div class="tile tile-text is-settings-text">
+      <h3>Settings, built from the manifest</h3>
+      <p>Outside the game screen, everything is a regular Sailfish page: Silica controls, pull-down
+      menus, and colours that follow the phone's ambience.</p>
+      <p>The settings page is generated from the game's manifest. Text speed and auto-advance
+      are always there; audio channels, toggles, dropdowns, text fields and sliders appear only
+      when the game declares them. Here the game asks for two character names, which the
+      script reads live.</p>
+    </div>
+    <div class="tile tile-text is-save-text">
+      <h3>Save slots</h3>
+      <p>Each slot keeps a thumbnail, a label chosen by the game, and the date.</p>
+    </div>
+    <figure class="tile tile-shot is-save">
       <img src="assets/img/save-screenshot.png"
-           alt="The save slots screen"
+           alt="The save game page with a slot showing a café thumbnail, the label At your café, and a date"
            width="1032" height="2272" loading="lazy">
-      <figcaption>Save slots.</figcaption>
     </figure>
   </div>
 

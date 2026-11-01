@@ -414,42 +414,148 @@ td code { white-space: nowrap; }
 }
 .hero .media figcaption { max-width: none; }
 
-/* screenshot mosaic: one row of real captures, no cropping. Each column's
-   fr value is its image's width/height ratio (2272 x 1032 landscape = 2.2016,
-   1032 x 2272 portrait = 0.4542), which gives every image the same rendered
-   height — so the row stays a clean rectangle without object-fit cropping.
-   Captions sit below the images rather than over them: in a visual novel
-   the bottom of the frame is where the textbox and choices are. On narrow
-   screens the wide shot takes a full row and the portraits pair up below. */
+/* screenshot mosaics. Two puzzle-style grids on the home page, each packing
+   into a clean rectangle, with every screenshot at its true aspect ratio
+   (device captures are 2272 x 1032 / 1032 x 2272, about 2.2:1) and no text
+   laid over an image: in a visual novel the bottom of the frame is where
+   the textbox and choices are, so an overlay hides exactly what matters.
+
+   Text and code tiles carry contain: size, so a row's height always comes
+   from its screenshots, never from the text beside them; anything longer
+   than its tile scrolls inside it.
+
+   .mosaic-styles, three games with their style JSON:
+     w1 w1 wc     two Wedding Plans shots (one per character style)
+     w2 w2 wc     beside one tall tile with the files behind them
+     c2 s2 s2     tall JSON (spans two rows) + big shot
+     c2 s3 c3     small shot (engine defaults) + a short note
+
+   .mosaic-system, settings and save slots as tall portraits at either end,
+   two text tiles stacked between them. */
 .mosaic {
   display: grid;
-  grid-template-columns: 2.2016fr 0.4542fr 0.4542fr;
   gap: clamp(10px, 1.4vw, 16px);
-  align-items: start;
   margin: clamp(28px, 4vw, 44px) 0 0;
 }
-.mosaic-item { margin: 0; min-width: 0; }
-.mosaic-item img {
+
+.mosaic + h2 { margin-top: var(--gap-block); }
+
+.tile { position: relative; margin: 0; min-width: 0; border-radius: 18px; }
+
+/* outline, not border: an inset outline takes no space, so it cannot nudge
+   an image off its aspect ratio */
+.tile-shot img {
   display: block;
   width: 100%;
   height: auto;
-  object-fit: contain;
-  /* outline, not border: a border adds to the box and breaks the equal
-     heights the fr ratios give; an inset outline takes no space */
+  border-radius: 18px;
   outline: 1px solid var(--ink-faint);
   outline-offset: -1px;
-  border-radius: 18px;
 }
-.mosaic-item figcaption {
-  margin-top: 8px;
-  font-size: 12.5px;
-  line-height: 1.5;
+.tile-placeholder {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2272 / 1032;
+  padding: 16px;
+  border-radius: 18px;
+  outline: 1px solid var(--ink-faint);
+  outline-offset: -1px;
+  background: repeating-linear-gradient(135deg, var(--ink-faint) 0 7px, transparent 7px 14px);
+  font-family: var(--mono);
+  font-size: 11px;
   color: var(--ink-3);
+  text-align: center;
 }
 
-@media (max-width: 700px) {
-  .mosaic { grid-template-columns: 1fr 1fr; gap: 14px; }
-  .mosaic-item.wide { grid-column: 1 / -1; }
+.tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: clamp(14px, 1.8vw, 20px);
+  background: var(--surface);
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+  contain: size;
+  overflow: auto;
+}
+.tile-text h3 { margin: 0; font-size: 17px; }
+.tile-text p { margin: 0; font-size: 13.5px; line-height: 1.6; max-width: none; }
+.tile-label {
+  font-family: var(--mono);
+  font-size: var(--step-meta);
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.tile-text pre {
+  flex: 1;
+  min-height: 0;
+  margin: 2px 0 0;
+  padding: 12px 14px;
+  font-size: 11px;
+  line-height: 1.5;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+/* style showcase */
+.mosaic-styles {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "w1 w1 wc"
+    "w2 w2 wc"
+    "c2 s2 s2"
+    "c2 s3 c3";
+}
+.mosaic-styles .is-w1 { grid-area: w1; }
+.mosaic-styles .is-w2 { grid-area: w2; }
+.mosaic-styles .is-wc { grid-area: wc; }
+.mosaic-styles .is-c2 { grid-area: c2; }
+.mosaic-styles .is-s2 { grid-area: s2; }
+.mosaic-styles .is-s3 { grid-area: s3; }
+.mosaic-styles .is-c3 { grid-area: c3; }
+
+/* settings + save */
+.mosaic-system {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-rows: 1.7fr 1fr;
+  grid-template-areas:
+    "set   set-t sav"
+    "set   sav-t sav";
+}
+.mosaic-system .is-settings      { grid-area: set; }
+.mosaic-system .is-settings-text { grid-area: set-t; }
+.mosaic-system .is-save-text     { grid-area: sav-t; justify-content: flex-end; }
+.mosaic-system .is-save          { grid-area: sav; }
+
+/* below ~1000px the middle column is too narrow for the settings text to
+   fit beside the portraits, so the portraits pair up and text goes below */
+@media (max-width: 1000px) {
+  .mosaic-system {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      "set   sav"
+      "set-t set-t"
+      "sav-t sav-t";
+  }
+  .mosaic-system .tile-text { contain: none; }
+}
+
+/* phones: one column, each screenshot followed by its own JSON */
+@media (max-width: 760px) {
+  .mosaic-styles {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: none;
+  }
+  .mosaic-styles .tile { grid-area: auto; }
+  .mosaic-styles .tile-text { contain: none; max-height: 560px; }
+  .mosaic-styles .is-w1 { order: 0; }
+  .mosaic-styles .is-w2 { order: 1; }
+  .mosaic-styles .is-wc { order: 2; }
+  .mosaic-styles .is-s2 { order: 3; }
+  .mosaic-styles .is-c2 { order: 4; }
+  .mosaic-styles .is-s3 { order: 5; }
+  .mosaic-styles .is-c3 { order: 6; }
 }
 
 /* placeholder: a stand-in image box, diagonal hazard-stripe fill, rounded
