@@ -94,7 +94,7 @@
         itself contains a colon), and with <code>//</code> for a comment the tool throws away.</p>
         <p class="hint">Lines starting with <code>@</code> are commands:
         <code>@label name</code>, <code>@jump name</code>, <code>@scene scene_0002</code>,
-        <code>@bg bg/room.png</code>, <code>@sprite liisa liisaBlink.json center</code>,
+        <code>@bg bg/room.png</code>, <code>@sprite liisa sprites/liisa_1.png center</code>,
         <code>@remove liisa</code>, <code>@set panic add 6</code>,
         <code>@style textbox colorful_textbox</code>, <code>@wait 500</code>, <code>@end</code>.
         Choices and conditional jumps are not in the shorthand — build those in the form, where the
@@ -376,15 +376,9 @@
         box.appendChild(cell("id", input(e.id, function (v) { e.id = v; touch(); },
           { spell: false, placeholder: "liisa" })));
         box.appendChild(cell("image", input(e.image, function (v) { e.image = v; touch(); },
-          { spell: false, placeholder: "liisaBlink.json" })));
+          { spell: false, placeholder: "sprites/liisa_1.png" })));
         box.appendChild(cell("position", input(e.position, function (v) { e.position = v; touch(); },
           { spell: false, placeholder: "left | center | right | 60%,0" })));
-        note(box, "<code>image</code> is a plain picture (<code>.png</code>, <code>.jpg</code>, " +
-          "<code>.jpeg</code>) or an animated sprite object (<code>.json</code>, made with the " +
-          "<a href=\"sprite-object.html\">sprite object editor</a>). The engine puts " +
-          "<code>assets/sprites/</code> in front itself, so <code>liisaBlink.json</code> means " +
-          "<code>assets/sprites/liisaBlink.json</code>. A sprite object starts all of its " +
-          "animations as soon as it is shown; this command has no way to pick one.");
         note(box, "Re-using an id replaces that sprite instead of adding a second one. " +
           "A pair like <code>60%,0</code> places the sprite's horizontal centre by hand.");
       }
@@ -565,11 +559,6 @@
           { spell: false, placeholder: "colorful_textbox" })));
         note(box, "Resolved from <code>assets/ui/" + esc(e.category) + "/&lt;id&gt;.json</code> " +
           "against the engine default — it replaces the active style rather than layering onto it.");
-        if (e.category === "textbox") note(box, "Current engine build: the textbox branch in " +
-          "<code>GameScreen.qml</code> tests <code>category === \"text\"</code>, so " +
-          "<code>\"textbox\"</code> falls through to the unknown-category warning and nothing " +
-          "changes on screen. The category name here follows the design document; the engine " +
-          "needs the fix.", true);
       }
     },
 
@@ -1714,31 +1703,9 @@
         if (p && ["left", "right", "center", "centre"].indexOf(p) === -1 && p.indexOf("%") === -1)
           pushNote(out, "info", "Position <code>" + esc(p) + "</code> is not one of " +
             "left/right/center and has no percent sign, so the engine centres the sprite.", i);
-
-        /* Mirrors beginSpritePipeline() in GameEngine.js: the path guard and the extension
-           check both make the engine refuse the sprite, so they are errors, not warnings.
-           Checked on the raw value — the engine does not trim. */
-        var img = c.image;
-        if (img.trim()) {
-          var dot = img.lastIndexOf(".");
-          var ext = dot <= 0 ? "" : img.substring(dot + 1).toLowerCase();
-          if (img.indexOf("..") !== -1 || img.charAt(0) === "/" || img.indexOf("\\") !== -1)
-            pushNote(out, "err", "Sprite image <code>" + esc(img) + "</code> is refused by the " +
-              "engine: the path must be relative to <code>assets/sprites/</code>, without " +
-              "<code>..</code>, a leading <code>/</code> or a backslash.", i);
-          else if (["png", "jpg", "jpeg", "json"].indexOf(ext) === -1)
-            pushNote(out, "err", "Sprite image <code>" + esc(img) + "</code> is refused by the " +
-              "engine: it expects <code>.png</code>, <code>.jpg</code>, <code>.jpeg</code> " +
-              "or a <code>.json</code> sprite object.", i);
-          else if (img.indexOf("sprites/") === 0 || img.indexOf("assets/") === 0)
-            pushNote(out, "warn", "<code>" + esc(img) + "</code> — sprite paths are relative to " +
-              "<code>assets/sprites/</code>, which the engine adds itself, so this looks in " +
-              "<code>assets/sprites/" + esc(img) + "</code>.", i);
-        }
       }
 
       ["image", "file"].forEach(function (k) {
-        if (c.cmd === "sprite" && k === "image") return;   /* own rules above */
         var v = str(c[k]).trim();
         if (!v) return;
         if (v.charAt(0) === "/" || v.indexOf("assets/") === 0)
