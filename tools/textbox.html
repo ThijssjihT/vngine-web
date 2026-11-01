@@ -59,7 +59,8 @@
             <span class="val" data-mirror="height" data-format="pct"></span>
           </div>
         </div>
-        <p class="hint" style="grid-column:1/-1">Fraction of the screen height.</p>
+        <p class="hint" style="grid-column:1/-1">Fraction of the height the top and bottom margins leave.
+        At 100% the three positions look the same.</p>
       </fieldset>
 
       <fieldset>
@@ -491,7 +492,10 @@
     var scale = (frameW / longSide) * pixelRatio;
     var px = function (v) { return (v * scale) + "px"; };
 
-    var h = frameH * state.height;
+    /* height is a fraction of the space the vertical margins leave, so all four
+       margins apply whatever the position (TextboxLayer.qml does the same) */
+    var availH = Math.max(0, frameH - scale * (state.margins.top + state.margins.bottom));
+    var h = availH * state.height;
     box.style.height = h + "px";
     box.style.left   = px(state.margins.left);
     box.style.right  = px(state.margins.right);
@@ -499,7 +503,7 @@
 
     box.style.top = box.style.bottom = "auto";
     if (state.position === "top")         box.style.top = px(state.margins.top);
-    else if (state.position === "center") box.style.top = ((frameH - h) / 2) + "px";
+    else if (state.position === "center") box.style.top = (scale * state.margins.top + (availH - h) / 2) + "px";
     else                                  box.style.bottom = px(state.margins.bottom);
 
     box.style.background   = T.rgba(state.background.color, state.background.opacity);
@@ -516,9 +520,11 @@
     inner.style.fontSize   = (FONT_SIZE_SMALL * scale) + "px";
     inner.style.lineHeight = "1.2";
 
-    warnEl.hidden = !(missing || cycle);
+    var degenerate = availH <= 0;
+    warnEl.hidden = !(missing || cycle || degenerate);
     if (cycle)        warnEl.textContent = "Circular inheritance — this style would not load";
     else if (missing) warnEl.textContent = "Parent style “" + missing + "” is missing — preview incomplete";
+    else if (degenerate) warnEl.textContent = "Top and bottom margins are taller than the screen — nothing left to draw in";
 
     metaEl.textContent = "Landscape, " + longSide + "×" + shortSide +
       " — Theme.pixelRatio ≈ " + pixelRatio.toFixed(2) + ". Approximate preview.";
