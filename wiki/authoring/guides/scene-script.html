@@ -34,7 +34,8 @@
 
     <div class="todo"><strong>Authoring rule</strong> — a scene must end with a <code>jump</code>.
     Running off the end of the command list is an authoring error; the engine warns and pops back
-    out of the game screen.</div>
+    out of the game screen. An <code>end</code> command, for finishing a story properly, is
+    <a href="#planned">planned</a>.</div>
 
     <h2>Implemented commands</h2>
     <table>
@@ -45,8 +46,9 @@
       <tr><td><code>bg</code></td><td><code>image</code></td>
           <td>Sets the background, relative to <code>assets/</code>. Continues immediately.</td></tr>
       <tr><td><code>sprite</code></td><td><code>id</code>, <code>image</code>, <code>position</code></td>
-          <td>Shows or replaces a sprite. Re-using an <code>id</code> swaps that sprite's image and position.</td></tr>
-      <tr><td><code>sprite_remove</code></td><td><code>id</code></td><td>Removes that sprite.</td></tr>
+          <td>Shows or replaces a sprite. Re-using an <code>id</code> swaps that sprite's image and position.
+              Continues immediately.</td></tr>
+      <tr><td><code>sprite_remove</code></td><td><code>id</code></td><td>Removes that sprite. Continues immediately.</td></tr>
       <tr><td><code>set</code></td><td><code>var</code>, <code>op</code>, <code>value</code> or <code>from</code></td>
           <td>Changes a variable. See <a href="variables.html">Variables and conditions</a>.</td></tr>
       <tr><td><code>label</code></td><td><code>label</code></td>
@@ -57,31 +59,92 @@
       <tr><td><code>jump_if</code></td><td><code>condition</code> + <code>label</code>/<code>scene</code></td>
           <td>Jumps only when the condition is true, otherwise falls through to the next command.</td></tr>
       <tr><td><code>choice</code></td><td><code>options</code></td>
-          <td>Shows a menu and waits. See below.</td></tr>
+          <td>Shows a menu and waits. See <a href="#choices">Choices</a>.</td></tr>
       <tr><td><code>style</code></td><td><code>category</code>, <code>style</code></td>
           <td>Switches the active style for <code>textbox</code>, <code>choice</code> or <code>hud</code>.
-              If the style cannot be loaded the current one is kept and a warning is logged.</td></tr>
+              See <a href="#styles-mid-scene">Styles mid-scene</a>.</td></tr>
+      <tr><td><code>audio_bg</code></td><td><code>action</code> and more</td>
+          <td>Controls the background music: start, change volume, stop, pause, resume.
+              See <a href="#audio">Audio</a>.</td></tr>
+      <tr><td><code>audio_fx</code></td><td><code>file</code>, <code>volume</code></td>
+          <td>Plays a one-shot sound effect. See <a href="#audio">Audio</a>.</td></tr>
+      <tr><td><code>audio_loop</code></td><td><code>action</code>, <code>id</code> and more</td>
+          <td>Starts and stops looping sound effects such as rain or a crowd.
+              See <a href="#audio">Audio</a>.</td></tr>
     </table>
 
     <p>An unknown command is logged and skipped, so a typo will not stall the game — but it will
-    not do what you meant either. Watch the console output while testing.</p>
+    not do what you meant either. That includes every command in the <a href="#planned">planned</a>
+    list below. Watch the console output while testing.</p>
 
     <h2>Dialogue</h2>
 <pre><code>{ "cmd": "say", "speaker": null,    "text": "The noticeboard is covered in paper." }
 { "cmd": "say", "speaker": "Liisa", "text": "Like this, %player_title%?" }</code></pre>
-    <p>Every displayed string passes through variable interpolation: <code>%name%</code> is
-    replaced by the variable of that name, or by a setting of that name. An unknown name is left
-    as-is and logged.</p>
+    <p>Dialogue text, the speaker name and choice option text all pass through variable
+    interpolation: <code>%name%</code> is replaced by the variable of that name, or by a setting of
+    that name. An unknown name is left as-is and logged.</p>
+    <p>Text is always written inline in <code>text</code> today. A <code>text_key</code> is
+    accepted but only shows the key in square brackets — translation lookup is
+    <a href="#planned">planned</a>. See <a href="localisation.html">Localisation</a>.</p>
+
+    <h2>Backgrounds</h2>
+<pre><code>{ "cmd": "bg", "image": "bg/noticeboard_closeup.png" }</code></pre>
+    <p>The path is relative to <code>qml/game/assets/</code>. The image is scaled to fill the screen
+    and cropped to fit. The background changes instantly: a <code>transition</code> key, as seen in
+    the sample script, is accepted but ignored until transitions are <a href="#planned">planned</a>
+    in.</p>
 
     <h2>Sprites</h2>
-<pre><code>{ "cmd": "sprite", "id": "liisa", "image": "sprites/liisa_1.png", "position": "left" }
-{ "cmd": "sprite", "id": "liisa", "image": "sprites/liisa_2.png", "position": "60%,0" }
+<pre><code>{ "cmd": "sprite", "id": "liisa", "image": "liisa_1.png",     "position": "left" }
+{ "cmd": "sprite", "id": "liisa", "image": "liisaBlink.json",  "position": "60%,100" }
 { "cmd": "sprite_remove", "id": "liisa" }</code></pre>
-    <p><code>position</code> accepts <code>left</code>, <code>right</code>, anything else centres
-    the sprite, or a percentage pair like <code>"60%,0"</code> to place it by hand. The percentage
-    is the horizontal centre of the sprite.</p>
+    <p><code>image</code> is relative to <code>qml/game/assets/sprites/</code> — do not start it with
+    <code>sprites/</code>. It can be:</p>
+    <ul>
+      <li>a plain <code>.png</code>, <code>.jpg</code> or <code>.jpeg</code> image, or</li>
+      <li>a <code>.json</code> <em>sprite object</em>: several stacked images with animations, such
+      as a character who blinks. Build one with the
+      <a href="../../../tools/sprite-object.html">sprite object editor</a>. Paths inside the file are
+      also relative to <code>assets/sprites/</code>, wherever the <code>.json</code> sits.</li>
+    </ul>
+    <p>A path containing <code>..</code>, a backslash or a leading <code>/</code> is rejected with a
+    warning, and so is an unknown file type; the sprite is then not shown.</p>
+    <p>A sprite is 90% of the screen height, and as wide as its first image. <code>position</code>:</p>
+    <ul>
+      <li><code>left</code> and <code>right</code>: against that side of the screen, at the bottom;</li>
+      <li>anything else, or nothing: centred at the bottom;</li>
+      <li>a percentage pair like <code>"60%,100"</code> to place it by hand. The first number is
+      where the sprite's horizontal centre goes, as a percentage of the screen width. The second is
+      where its <em>bottom edge</em> goes, as a percentage of the screen height: <code>100</code>
+      stands the sprite on the bottom of the screen, <code>0</code> puts it entirely above the
+      screen.</li>
+    </ul>
 
-    <h2>Choices</h2>
+    <h2>Jumping and labels</h2>
+<pre><code>{ "cmd": "label", "label": "dont_panic" }
+{ "cmd": "jump",  "label": "dont_panic" }
+{ "cmd": "jump",  "scene": "scene_0002" }
+{ "cmd": "jump_if", "condition": { "var": "panic", "op": "&gt;=", "value": 3 }, "label": "meltdown" }</code></pre>
+    <ul>
+      <li>A <code>label</code> jump stays inside the current scene. A <code>scene</code> jump loads
+      that scene and starts at its first command; there is no way to jump to a label in another
+      scene.</li>
+      <li>If a jump has both <code>label</code> and <code>scene</code>, <code>label</code> wins and
+      <code>scene</code> is silently ignored.</li>
+      <li>A jump to a label that does not exist is logged and the script carries on with the next
+      command.</li>
+      <li>Duplicate labels in one scene are not an error: the last one wins, and the earlier one
+      becomes unreachable.</li>
+      <li><code>jump_if</code> with a false condition falls through to the next command.
+      Conditions are covered in <a href="variables.html">Variables and conditions</a>.</li>
+    </ul>
+    <div class="todo"><strong>Loops need a tap in them</strong> — the engine runs non-waiting
+    commands by calling itself, so a loop made only of <code>jump</code> / <code>jump_if</code> /
+    <code>set</code> commands, with no <code>say</code> or <code>choice</code> inside it, does not loop
+    forever: it crashes the game with a stack overflow. Make sure every loop contains something the
+    player has to tap through.</div>
+
+    <h2 id="choices">Choices</h2>
 <pre><code>{
     "cmd": "choice",
     "options": [
@@ -93,31 +156,119 @@
         {
             "text": "Panic",
             "condition": null,
-            "effects": [ { "var": "panic", "op": "sub", "value": 1 } ],
+            "effects": [ { "var": "panic", "op": "add", "value": 1 } ],
             "label": "label_panic"
         },
         {
+            "text": "Panic in another scene",
+            "scene": "scene_0005"
+        },
+        {
             "text": "Panic hard",
-            "effects": [ { "var": "panic", "op": "sub", "value": 1 } ]
+            "effects": [ { "var": "panic", "op": "add", "value": 2 } ]
         }
     ]
 }</code></pre>
     <table>
       <tr><th>Key</th><th>Meaning</th></tr>
-      <tr><td><code>text</code></td><td>The option label. Interpolated like dialogue.</td></tr>
+      <tr><td><code>text</code></td><td>The option label. Interpolated like dialogue. (<code>text_key</code> shows a bracketed placeholder for now.)</td></tr>
       <tr><td><code>condition</code></td><td>Option is hidden unless this is true. <code>null</code> or absent means always visible.</td></tr>
-      <tr><td><code>effects</code></td><td>List of <code>set</code>-style changes applied when the option is picked.</td></tr>
-      <tr><td><code>label</code></td><td>Where to continue. Without it, the script simply carries on after the choice.</td></tr>
+      <tr><td><code>effects</code></td><td>List of <code>set</code>-style changes (<code>var</code>, <code>op</code>, <code>value</code> or <code>from</code>) applied when the option is picked.</td></tr>
+      <tr><td><code>label</code></td><td>Label in this scene to continue at.</td></tr>
+      <tr><td><code>scene</code></td><td>Scene to continue in, from its first command. Same rules as <code>jump</code>: if both are present, <code>label</code> wins.</td></tr>
     </table>
-    <p>If every option is hidden, the engine warns and skips the choice rather than trapping the
-    player — so make sure at least one option has no condition.</p>
+    <p>An option with neither <code>label</code> nor <code>scene</code> simply carries on with the
+    command after the choice. That is deliberate, so you do not have to write a label and a jump for
+    "and then continue". The engine still logs a note, in case it was a typo — if an option does not
+    branch, check the console for that note and the option's key names. The key is
+    <code>label</code> or <code>scene</code>, <strong>not</strong> <code>next</code>.</p>
+    <p>If every option is hidden by its condition, the engine warns and skips the whole choice rather
+    than trapping the player — so make sure at least one option has no condition, or the player may
+    never see the menu. How the menu looks is set in the <a href="theming.html">choice style</a>.</p>
 
-    <h2>Styles mid-scene</h2>
+    <h2 id="styles-mid-scene">Styles mid-scene</h2>
 <pre><code>{ "cmd": "style", "category": "textbox", "style": "colorful_textbox" }</code></pre>
-    <p>Build the style file with the <a href="../../../tools/textbox.html">textbox style generator</a>.</p>
+    <p><code>category</code> is <code>textbox</code>, <code>choice</code> or <code>hud</code>.
+    <code>style</code> is a file name, without <code>.json</code>, from
+    <code>assets/ui/&lt;category&gt;/</code>. The style is built from scratch each time — engine
+    default, then the style's parents, then the style itself — it does not add on top of whatever was
+    active before. If it cannot be loaded, the engine logs a warning and that category goes back to
+    the engine default. An unknown category is logged and ignored. The active style is saved with
+    the game. Build style files with the <a href="../../../tools/textbox.html">textbox</a> and
+    <a href="../../../tools/choice.html">choice</a> style generators. A <code>hud</code> style can be
+    switched, but there is no on-screen HUD to apply it to yet.</p>
 
-    <div class="todo"><strong>TODO</strong> — audio, transitions, HUD and text effects appear in the
-    sample script but are not implemented yet. They are documented once they land.</div>
+    <h2 id="audio">Audio</h2>
+    <p>Audio files live under <code>qml/game/assets/audio/</code> and are named relative to it, for
+    example <code>music/Origami.mp3</code> or <code>sfx/boink.mp3</code>. Every command here scales
+    its volume by the matching volume slider on the Settings screen, so the game needs that channel
+    declared under <code>audio_channels</code> in the <a href="manifest.html">manifest</a>:
+    <code>music</code> for <code>audio_bg</code>, <code>game_fx</code> for <code>audio_fx</code> and
+    <code>looping_fx</code> for <code>audio_loop</code>. A <code>volume</code> in a command is a
+    multiplier from 0 to 1 on top of that slider (default 1).</p>
+
+    <h3>audio_bg — background music</h3>
+<pre><code>{ "cmd": "audio_bg", "action": "setMusic", "tracks": ["music/Origami.mp3"], "fadeTime": 800 }
+{ "cmd": "audio_bg", "action": "setVolume", "volume": 0.4, "fadeTime": 1000 }
+{ "cmd": "audio_bg", "action": "pause" }
+{ "cmd": "audio_bg", "action": "resume" }
+{ "cmd": "audio_bg", "action": "stop", "fadeTime": 2000 }</code></pre>
+    <table>
+      <tr><th><code>action</code></th><th>Keys</th><th>Effect</th></tr>
+      <tr><td><code>setMusic</code></td><td><code>tracks</code> (required, a list), <code>loop</code>, <code>transition</code>, <code>fadeTime</code>, <code>volume</code></td>
+          <td>Starts the listed tracks, crossfading away from whatever was playing. Several tracks play
+              in order; with <code>loop</code> (default <code>true</code>) the list starts over after
+              the last one, and a single looping track repeats. <code>"transition": "cut"</code>
+              switches instantly; anything else fades over <code>fadeTime</code> milliseconds
+              (default 800).</td></tr>
+      <tr><td><code>setVolume</code></td><td><code>volume</code>, <code>fadeTime</code></td><td>Fades the current music to a new multiplier.</td></tr>
+      <tr><td><code>stop</code></td><td><code>fadeTime</code></td><td>Fades out and clears the track list. No <code>fadeTime</code> stops at once.</td></tr>
+      <tr><td><code>pause</code>, <code>resume</code></td><td>—</td><td>Pauses and resumes the current track.</td></tr>
+    </table>
+    <p>The music state is saved with the game.</p>
+
+    <h3>audio_fx — one-shot effects</h3>
+<pre><code>{ "cmd": "audio_fx", "file": "sfx/boink.mp3" }
+{ "cmd": "audio_fx", "file": "sfx/tram_distant.mp3", "volume": 0.5 }</code></pre>
+    <p>Plays the file once, on the <code>game_fx</code> channel, and carries on straight away. Up to
+    four effects can play at the same time; a fifth is skipped with a warning. That limit is also
+    the hint that long or repeating sounds do not belong here — use <code>audio_loop</code>.</p>
+
+    <h3>audio_loop — looping effects</h3>
+<pre><code>{ "cmd": "audio_loop", "action": "start",   "id": "rain", "file": "sfx/rain.mp3", "volume": 0.6, "fadeTime": 1500 }
+{ "cmd": "audio_loop", "action": "stop",    "id": "rain", "fadeTime": 1500 }
+{ "cmd": "audio_loop", "action": "stopAll", "fadeTime": 500 }</code></pre>
+    <p>For ambience. <code>id</code> is a name you choose, used to stop that loop later. Up to four
+    loops can run at once. Starting an <code>id</code> that is already playing the same file only
+    adjusts its volume. Stopping an unknown <code>id</code> is logged and ignored. All loops and the
+    music are stopped when a new game starts or a save is loaded.</p>
+
+    <h2>Things that surprise people</h2>
+    <ul>
+      <li>Choice options branch with <code>label</code> or <code>scene</code>, never
+      <code>next</code>, and <code>alt_scene</code> does nothing.</li>
+      <li><code>set</code> copies a value from a variable or setting with a <code>from</code> block.
+      <code>from_setting</code> is not supported.</li>
+      <li>Each kind of path has its own base folder: sprites are relative to
+      <code>assets/sprites/</code>, backgrounds to <code>assets/</code>, audio to
+      <code>assets/audio/</code>.</li>
+      <li>Variables and settings share one lookup namespace for <code>%name%</code> text and
+      <code>flag</code> conditions; see <a href="variables.html">Variables and conditions</a>.</li>
+    </ul>
+
+    <h2 id="planned">Planned, not implemented yet</h2>
+    <p>These are part of the design but the engine does not do them yet. Putting one in a script
+    does no harm — an unknown command is logged and skipped — but it has no effect either.</p>
+    <table>
+      <tr><th>Command or key</th><th>Intended use</th></tr>
+      <tr><td><code>end</code></td><td>End of the game or a route: shows an end card and returns to the title screen.</td></tr>
+      <tr><td><code>wait</code></td><td>Pause for a number of milliseconds before continuing.</td></tr>
+      <tr><td><code>show_hud</code> and the HUD itself</td><td>Show or hide a variable value in an on-screen overlay, drawn with the <code>hud</code> style.</td></tr>
+      <tr><td><code>audio_voice</code></td><td>Voiced lines on the <code>voice</code> channel.</td></tr>
+      <tr><td><code>transition</code> on <code>bg</code> and <code>sprite_remove</code></td><td>Fade or slide instead of an instant change. The key is accepted and ignored.</td></tr>
+      <tr><td><code>text_key</code></td><td>Look the line up in the language file for the active language. Today it shows <code>[the_key]</code>.</td></tr>
+      <tr><td><code>alt_scene</code> on choice options</td><td>An alternative scene for when the option is hidden or disabled.</td></tr>
+    </table>
 
     <div class="pager">
       <a href="manifest.html">← Manifest</a>

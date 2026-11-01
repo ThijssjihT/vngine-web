@@ -21,8 +21,16 @@
 <pre><code>"variables": {
     "panic": { "type": "int", "default": 1 }
 }</code></pre>
+    <p><code>type</code> is one of <code>int</code>, <code>float</code>, <code>string</code> or
+    <code>bool</code>. Today it is documentation only: the engine reads <code>default</code> and
+    nothing else, so a mismatch between the two is not checked. Keep them consistent yourself.</p>
     <p>Variables are saved and restored with the save game, so a loaded game continues with the
     values it had.</p>
+    <p>Declaring is not strictly required: a <code>set</code> on a name that was never declared
+    creates it on the spot. That also means a typo in a variable name quietly creates a new
+    variable instead of failing, so declare the ones you use. The one exception that is created for
+    you is the variable named by <code>save_display_variable</code> in the manifest, which is
+    shown on the save slots; if you do not declare it, it starts out as <code>"empty"</code>.</p>
 
     <h2>Changing a variable</h2>
 <pre><code>{ "cmd": "set", "var": "panic", "op": "set", "value": 3 }
@@ -49,32 +57,49 @@
     against.</p>
 <pre><code>{ "var":     "panic",      "op": "&lt;",  "value": 3 }
 { "setting": "difficulty", "op": "==", "value": "hard" }
-{ "flag":    "arachnofobia" }</code></pre>
+{ "flag":    "arachnophobia" }</code></pre>
     <table>
       <tr><th>Key</th><th>Looks at</th></tr>
       <tr><td><code>var</code></td><td>A game variable.</td></tr>
       <tr><td><code>setting</code></td><td>A value from the settings page.</td></tr>
       <tr><td><code>flag</code></td><td>A variable, falling back to a setting of the same name.</td></tr>
     </table>
+    <p><code>setting</code> is read live, so a change on the Settings screen takes effect the next
+    time the condition is checked. Toggles, dropdowns, sliders and text fields are reached by the
+    plain key you gave them in the <a href="manifest.html">manifest</a>. Audio channels and language
+    selectors have no short key and are meant for the engine, not for stories.</p>
     <p>Operators: <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>,
     <code>&gt;</code>, <code>&gt;=</code>. Comparison is strict, so <code>3</code> and
     <code>"3"</code> are not equal — keep your types consistent with what you declared.</p>
     <p>With no <code>op</code>, the value is simply tested for truthiness: <code>0</code>, an empty
     string and <code>false</code> are false, everything else is true. That is the short form for a
     flag.</p>
-    <p>No condition at all — a missing key or <code>null</code> — is true. An undefined variable
-    or a missing comparison value is false, with a warning.</p>
+    <p>No condition at all — a missing key or <code>null</code> — is true. An undefined variable,
+    an unknown setting, a missing comparison value, an unknown operator or a condition with none of
+    <code>var</code>, <code>setting</code> or <code>flag</code> is false, with a warning.</p>
+    <p><strong>Variables and settings share names.</strong> In <code>flag</code> conditions and in
+    <code>%name%</code> text the variable is looked up first, so a variable and a setting with the
+    same name hide the setting. <code>var</code> and <code>setting</code> conditions only ever look
+    in their own place. Avoid giving a variable the same name as a toggle, dropdown, slider or text
+    field; the <a href="../../../tools/manifest.html">manifest generator</a> warns when you do.</p>
 
     <h2>Where conditions are used</h2>
 <pre><code>{ "cmd": "jump_if", "condition": { "var": "panic", "op": "&gt;=", "value": 3 }, "label": "meltdown" }</code></pre>
     <p>And on choice options, to hide them until they are earned — see
-    <a href="scene-script.html">Scene script commands</a>.</p>
+    <a href="scene-script.html#choices">Choices</a>. The <code>effects</code> of a choice option are
+    <code>set</code>-style changes with the same keys: <code>var</code>, <code>op</code> and
+    <code>value</code> or <code>from</code>.</p>
 
     <h2>Showing variables in text</h2>
-    <p>Wrap the name in percent signs. The engine looks for a variable first, then a setting.</p>
+    <p>Wrap the name in percent signs. The engine looks for a variable first, then a setting. This
+    works in dialogue text, speaker names and choice option text.</p>
 <pre><code>{ "cmd": "say", "speaker": "Liisa", "text": "Like this, %player_title%?" }</code></pre>
     <p>Names must start with a letter or underscore and contain only letters, digits and
     underscores. An unknown name is left in the text as written, so a typo shows up on screen.</p>
+
+    <div class="todo"><strong>Planned</strong> — the design also describes built-in read-only
+    variables: <code>current_language</code>, <code>playtime_seconds</code> and
+    <code>save_slot_label</code>. They do not exist in the engine yet, so a script cannot read them.</div>
 
     <div class="pager">
       <a href="scene-script.html">← Scene script commands</a>

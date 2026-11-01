@@ -50,12 +50,24 @@
     <p>If a style cannot be resolved at all, the engine warns and falls back to the engine default.</p>
 
     <h2>Applying a style</h2>
-    <p>At the start of the game, from the <a href="manifest.html">manifest</a>:</p>
+    <p>During a scene, with the <code>style</code> command:</p>
+<pre><code>{ "cmd": "style", "category": "textbox", "style": "colorful_textbox" }</code></pre>
+    <p>The style is resolved from scratch each time, so it replaces the previous style of that
+    category rather than adding to it. If it cannot be loaded, the engine warns and that category
+    falls back to the engine default.</p>
+    <p>A save remembers the style id of each category and resolves it again on load, so a loaded
+    game looks the way it did when it was saved, including any later edits to the style file.</p>
+    <p>Every new game and every loaded game starts from the engine default for all three
+    categories, before the first <code>style</code> command or the saved ids are applied.</p>
+
+    <div class="todo"><strong>Planned</strong> — <code>default_styles</code> in the
+    <a href="manifest.html">manifest</a>, naming a style per category to use from the start of the
+    game:
 <pre><code>"default_styles": {
     "textbox": "boring_textbox"
 }</code></pre>
-    <p>Or during a scene:</p>
-<pre><code>{ "cmd": "style", "category": "textbox", "style": "colorful_textbox" }</code></pre>
+    The manifest generator writes it and the sample game declares it, but the engine does not read it
+    yet. Until it does, put a <code>style</code> command at the top of your first scene.</div>
 
     <h2>The textbox style</h2>
     <p>These are the engine defaults. Anything you do not set behaves like this.</p>
@@ -81,25 +93,75 @@
       <tr><td><code>radius</code></td><td>Corner radius in scaled pixels.</td></tr>
     </table>
 
-    <div class="todo"><strong>Scaled pixels</strong> — every pixel value above
-    (margins, padding, border width, radius) is multiplied by <code>Theme.pixelRatio</code> at
-    render time. Write the numbers as they should look on a reference 540&nbsp;px-wide screen and
-    they stay proportionally the same on every device. <code>height</code> is a fraction, so it is
-    not scaled.</div>
+    <div class="todo"><strong>Scaled pixels</strong> — every pixel value on this page
+    (margins, padding, border width, radius, spacing, minimum height) is multiplied by
+    <code>Theme.pixelRatio</code> at render time. Write the numbers as they should look on a
+    reference 540&nbsp;px-wide screen and they stay proportionally the same on every device.
+    Fractions (<code>height</code>, <code>width</code>), opacities and <code>columns</code> are not
+    scaled.</div>
 
-    <h2>Choice and HUD styles</h2>
-    <p>Both categories currently have a two-key default:</p>
+    <p>The text inside the textbox is not styleable yet: the speaker name uses the theme's highlight
+    colour in bold, the dialogue the theme's primary colour, both at the small font size.</p>
+
+    <h2>The choice style</h2>
+    <p>The choice menu is a block (the <code>grid</code>) holding one box per option (the
+    <code>option</code>). Again, these are the engine defaults.</p>
+<pre><code>{
+    "style": {
+        "grid": {
+            "columns": 1,
+            "spacing": 16,
+            "width": 0.8,
+            "margins":    { "left": 0, "right": 0, "top": 0, "bottom": 0 },
+            "padding":    { "left": 0, "right": 0, "top": 0, "bottom": 0 },
+            "background": { "color": "#000000", "opacity": 0 },
+            "border":     { "width": 0, "color": "#000000", "opacity": 1 },
+            "radius": 0
+        },
+        "option": {
+            "min_height": 0,
+            "padding":    { "left": 24, "right": 24, "top": 16, "bottom": 16 },
+            "background": { "color": "#000000", "opacity": 0.7 },
+            "border":     { "width": 0, "color": "#000000", "opacity": 1 },
+            "radius": 0,
+            "text":       { "color": null }
+        }
+    }
+}</code></pre>
+    <table>
+      <tr><th>Key</th><th>Meaning</th></tr>
+      <tr><td><code>grid.columns</code></td><td>Number of columns the options are laid out in. Columns share the block's width equally.</td></tr>
+      <tr><td><code>grid.spacing</code></td><td>Gap between options, horizontally and vertically.</td></tr>
+      <tr><td><code>grid.width</code></td><td>Width of the block as a fraction (0 to 1) of the screen width left after the left and right margins.</td></tr>
+      <tr><td><code>grid.margins</code></td><td>Space kept free around the block. The block is centred in what is left, both ways, so unequal margins move it. Its height always comes from its contents.</td></tr>
+      <tr><td><code>grid.padding</code></td><td>Space between the block's edge and the options.</td></tr>
+      <tr><td><code>grid.background</code>, <code>grid.border</code>, <code>grid.radius</code></td><td>Fill, border and corners of the block. The default background is fully transparent.</td></tr>
+      <tr><td><code>option.min_height</code></td><td>Minimum height of one option box. An option is otherwise as tall as its text plus padding.</td></tr>
+      <tr><td><code>option.padding</code></td><td>Space between an option box's edge and its text.</td></tr>
+      <tr><td><code>option.background</code>, <code>option.border</code>, <code>option.radius</code></td><td>Fill, border and corners of each option box.</td></tr>
+      <tr><td><code>option.text.color</code></td><td>Colour of the option text. <code>null</code> uses the theme's primary colour.</td></tr>
+    </table>
+    <p>Option text is centred and wraps to the box width. The game's <code>qml/game/assets/ui/choice/flashy_choice.json</code>
+    shows a style that overrides most of these.</p>
+
+    <h2>The HUD style</h2>
+    <p>The HUD category currently has a two-key default:</p>
 <pre><code>{
     "style": {
         "color": "#000000",
         "opacity": 0.7
     }
 }</code></pre>
+    <div class="todo"><strong>Planned</strong> — the HUD itself. A <code>hud</code> style file can be
+    written and switched to with the <code>style</code> command, but the engine does not draw a HUD
+    yet (<code>show_hud</code> is not implemented), so it has no visible effect. Expect the schema to
+    grow, as the textbox and choice styles have.</div>
 
     <h2>Building one</h2>
-    <p>The <a href="../../../tools/textbox.html">textbox style generator</a> writes these files for
-    you, with a live preview. It outputs only the values that differ from the default, which is
-    exactly what you want in a style file.</p>
+    <p>The <a href="../../../tools/textbox.html">textbox</a> and
+    <a href="../../../tools/choice.html">choice</a> style generators write these files for you, with
+    a live preview. They output only the values that differ from the default, which is exactly what
+    you want in a style file. A HUD style generator is planned along with the HUD.</p>
 
     <div class="pager">
       <a href="variables.html">← Variables and conditions</a>
