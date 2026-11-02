@@ -27,6 +27,7 @@
           <input type="text" id="styleId" value="my_textbox">
         </div>
         <p class="hint" style="grid-column:1/-1">Saved as <code id="pathHint">assets/ui/textbox/my_textbox.json</code></p>
+        <p class="chain-warn" id="idWarn" hidden style="grid-column:1/-1"></p>
       </fieldset>
 
       <fieldset>
@@ -199,6 +200,7 @@
   var chain    = [];                  // resolved, root -> direct parent
   var missing  = null;                // an ancestor we were told about but do not have
   var cycle    = null;                // circular inheritance path, if any
+  var badId    = null;                // [refused base, ...its children in the chain], if any
   var note     = "";                  // extra note for the chain box
   var meta     = { styleId: "my_textbox" };
 
@@ -209,6 +211,7 @@
   var diffOnly  = document.getElementById("diffOnly");
   var diffNote  = document.getElementById("diffNote");
   var chainBox  = document.getElementById("chainBox");
+  var idWarn    = document.getElementById("idWarn");
   var deviceSel = document.getElementById("device");
   var customBox = document.getElementById("customSize");
   var frame     = document.getElementById("frame");
@@ -315,6 +318,7 @@
     chain = [];
     missing = null;
     cycle = null;
+    badId = null;
 
     /* The style being edited is part of the chain, even though it was never
        uploaded — a parent that leads back to it is a loop, not a missing file. */
@@ -324,13 +328,18 @@
       var seen = {}, cur = myBase;
       seen[self] = true;
 
-      while (cur && parents[cur] && !seen[cur]) {
+      while (cur && !T.styleIdProblem(cur) && parents[cur] && !seen[cur]) {
         seen[cur] = true;
         chain.unshift(cur);
         cur = parents[cur].base;
       }
 
-      if (cur && seen[cur]) {
+      if (cur && T.styleIdProblem(cur)) {
+        /* loadStyleChain() checks the id before anything else and fails the
+           whole resolution, so nothing from the chain reaches the screen */
+        badId = [cur].concat(chain);      // the bad id, then the parents below it
+        chain = [];
+      } else if (cur && seen[cur]) {
         /* chain is root-first; walking out from self visits it in reverse */
         cycle = [self].concat(chain.slice().reverse()).concat([cur]).join(" → ");
         chain = [];                       // the engine rejects the whole chain
@@ -350,6 +359,18 @@
       return;
     }
     chainBox.className = "chain";
+
+    if (badId) {
+      chainBox.innerHTML =
+        badId.map(function (id, i) {
+          return '<span class="chain-link' + (i ? "" : " cyclic") + '">' + T.escHtml(id) + "</span>";
+        }).join(' <span class="chain-arrow">→</span> ') +
+        ' <span class="chain-arrow">→</span> <span class="chain-link mine">' +
+        T.escHtml(meta.styleId) + "</span>" +
+        '<p class="chain-warn"><strong>This style would not load</strong> — a <code>base</code> ' +
+        "in its chain is invalid. " + T.styleIdProblem(badId[0]) + "</p>";
+      return;
+    }
 
     if (cycle) {
       chainBox.innerHTML =
@@ -521,8 +542,9 @@
     inner.style.lineHeight = "1.2";
 
     var degenerate = availH <= 0;
-    warnEl.hidden = !(missing || cycle || degenerate);
-    if (cycle)        warnEl.textContent = "Circular inheritance — this style would not load";
+    warnEl.hidden = !(badId || missing || cycle || degenerate);
+    if (badId)            warnEl.textContent = "Invalid style id in the chain — this style would not load";
+    else if (cycle)        warnEl.textContent = "Circular inheritance — this style would not load";
     else if (missing) warnEl.textContent = "Parent style “" + missing + "” is missing — preview incomplete";
     else if (degenerate) warnEl.textContent = "Top and bottom margins are taller than the screen — nothing left to draw in";
 
@@ -532,6 +554,9 @@
 
   function render() {
     pathHint.textContent = "assets/ui/textbox/" + meta.styleId + ".json";
+    var idIssue = T.styleIdProblem(meta.styleId);
+    idWarn.hidden = !idIssue;
+    idWarn.innerHTML = idIssue ? "Nothing can load this file under that name. " + idIssue : "";
     renderChainBox();
     output.textContent = T.pretty(buildOutput());
     diffNote.textContent = cycle

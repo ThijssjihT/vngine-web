@@ -2083,6 +2083,8 @@
 
       if (c.cmd === "style" && !c.style.trim())
         pushNote(out, "warn", "Names no style id.", i);
+      else if (c.cmd === "style" && T.styleIdProblem(c.style))
+        pushNote(out, "warn", T.styleIdProblem(c.style), i);
 
       if (c.cmd === "__raw") {
         try { JSON.parse(c._text); }

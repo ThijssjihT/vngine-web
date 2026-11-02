@@ -214,7 +214,39 @@ window.VNTool = (function () {
     return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + alpha + ")";
   }
 
+  /* --- style ids ---------------------------------------------------- */
+
+  function escHtml(v) {
+    return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  /* Mirrors GameEngine.js loadStyleChain(): a style id containing ".", "/" or
+     "\\" is refused before any file is read, and the engine falls back to the
+     engine default for that category. That covers every place an id is used:
+     a `style` command, `default_styles` in game.json, and every `base` in an
+     inheritance chain. Returns one HTML sentence saying what is wrong and what
+     to write instead, or null when the id is acceptable. An empty id is not
+     this check's business. Shared by the scene, manifest, textbox and choice
+     tools, so the four agree. */
+  var STYLE_ID_BAD = /[.\/\\]/;
+
+  function styleIdProblem(id) {
+    if (typeof id !== "string" || !STYLE_ID_BAD.test(id)) return null;
+    var stem = id.replace(/\.json$/i, ""), fix;
+    if (stem && !STYLE_ID_BAD.test(stem))
+      fix = "Write <code>" + escHtml(stem) + "</code> — the engine adds <code>.json</code> itself.";
+    else if (/[\/\\]/.test(id))
+      fix = "A style id is a plain file name inside <code>assets/ui/&lt;category&gt;/</code>; " +
+            "it cannot be a path.";
+    else
+      fix = "Rename the file so its name has no dot, and use that name here.";
+    return "<code>" + escHtml(id) + "</code> is not a valid style id: the engine refuses any id " +
+           "containing <code>.</code>, <code>/</code> or <code>\\</code> and uses the engine " +
+           "default for that category instead. " + fix;
+  }
+
   return {
+    styleIdProblem: styleIdProblem, escHtml: escHtml,
     isPlainObject: isPlainObject, clone: clone, mergeStyle: mergeStyle, diff: diff,
     get: get, set: set, bindForm: bindForm, syncMirrors: syncMirrors,
     pretty: pretty, copy: copy, download: download, wireLoaders: wireLoaders,

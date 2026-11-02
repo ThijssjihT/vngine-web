@@ -27,6 +27,7 @@
           <input type="text" id="styleId" value="my_choice">
         </div>
         <p class="hint">Saved as <code id="pathHint">assets/ui/choice/my_choice.json</code></p>
+        <p class="chain-warn" id="idWarn" hidden style="grid-column:1/-1"></p>
       </fieldset>
 
       <fieldset>
@@ -313,6 +314,7 @@
   var chain    = [];
   var missing  = null;
   var cycle    = null;
+  var badId    = null;                // [refused base, ...its children in the chain], if any
   var note     = "";
   var meta     = { styleId: "my_choice" };
 
@@ -329,6 +331,7 @@
   var diffOnly  = document.getElementById("diffOnly");
   var diffNote  = document.getElementById("diffNote");
   var chainBox  = document.getElementById("chainBox");
+  var idWarn    = document.getElementById("idWarn");
   var deviceSel = document.getElementById("device");
   var customBox = document.getElementById("customSize");
   var frame     = document.getElementById("frame");
@@ -463,20 +466,25 @@
   /* parent chain ---------------------------------------------------- */
 
   function rebuildBaseline() {
-    chain = []; missing = null; cycle = null;
+    chain = []; missing = null; cycle = null; badId = null;
     var self = meta.styleId;
 
     if (myBase) {
       var seen = {}, cur = myBase;
       seen[self] = true;
 
-      while (cur && parents[cur] && !seen[cur]) {
+      while (cur && !T.styleIdProblem(cur) && parents[cur] && !seen[cur]) {
         seen[cur] = true;
         chain.unshift(cur);
         cur = parents[cur].base;
       }
 
-      if (cur && seen[cur]) {
+      if (cur && T.styleIdProblem(cur)) {
+        /* loadStyleChain() checks the id before anything else and fails the
+           whole resolution, so nothing from the chain reaches the screen */
+        badId = [cur].concat(chain);      // the bad id, then the parents below it
+        chain = [];
+      } else if (cur && seen[cur]) {
         cycle = [self].concat(chain.slice().reverse()).concat([cur]).join(" → ");
         chain = [];
       } else if (cur) {
@@ -495,6 +503,18 @@
       return;
     }
     chainBox.className = "chain";
+
+    if (badId) {
+      chainBox.innerHTML =
+        badId.map(function (id, i) {
+          return '<span class="chain-link' + (i ? "" : " cyclic") + '">' + T.escHtml(id) + "</span>";
+        }).join(' <span class="chain-arrow">→</span> ') +
+        ' <span class="chain-arrow">→</span> <span class="chain-link mine">' +
+        T.escHtml(meta.styleId) + "</span>" +
+        '<p class="chain-warn"><strong>This style would not load</strong> — a <code>base</code> ' +
+        "in its chain is invalid. " + T.styleIdProblem(badId[0]) + "</p>";
+      return;
+    }
 
     if (cycle) {
       chainBox.innerHTML =
@@ -838,8 +858,9 @@
     });
 
     var degenerate = availW <= 0;
-    warnEl.hidden = !(missing || cycle || degenerate);
-    if (cycle)           warnEl.textContent = "Circular inheritance — this style would not load";
+    warnEl.hidden = !(badId || missing || cycle || degenerate);
+    if (badId)            warnEl.textContent = "Invalid style id in the chain — this style would not load";
+    else if (cycle)           warnEl.textContent = "Circular inheritance — this style would not load";
     else if (missing)    warnEl.textContent = "Parent style “" + missing + "” is missing — preview incomplete";
     else if (degenerate) warnEl.textContent = "Margins are wider than the screen — nothing left to draw in";
 
@@ -880,6 +901,9 @@
 
   function renderInner() {
     pathHint.textContent = "assets/ui/choice/" + meta.styleId + ".json";
+    var idIssue = T.styleIdProblem(meta.styleId);
+    idWarn.hidden = !idIssue;
+    idWarn.innerHTML = idIssue ? "Nothing can load this file under that name. " + idIssue : "";
     borderWarning(gBorderWarn, state.grid.border, "grid frame");
     borderWarning(oBorderWarn, state.option.border, "option");
     syncTextColourUI();

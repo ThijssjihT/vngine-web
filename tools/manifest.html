@@ -757,6 +757,11 @@
       out.push(["warn", "Entry scene <code>" + esc(state.entry_scene) +
                 "</code> is not a plain file name — it is used as <code>script/&lt;id&gt;.json</code>."]);
 
+    ["textbox", "choice", "hud"].forEach(function (c) {
+      var issue = T.styleIdProblem((state.default_styles[c] || "").trim());
+      if (issue) out.push(["warn", "Default " + c + " style: " + issue]);
+    });
+
     /* variables and the four settings lists share one lookup namespace */
     ["variables"].concat(SETTING_LISTS).forEach(function (name) {
       var unnamed = 0;
