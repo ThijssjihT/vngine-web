@@ -501,7 +501,7 @@
         box.appendChild(cell("image", input(e.image, function (v) { e.image = v; touch(); },
           { spell: false, placeholder: "liisaBlink.json" })));
         box.appendChild(cell("position", input(e.position, function (v) { e.position = v; touch(); },
-          { spell: false, placeholder: "left | center | right | 60%,0" })));
+          { spell: false, placeholder: "left | center | right | 60%,100%" })));
         note(box, "<code>image</code> is a plain picture (<code>.png</code>, <code>.jpg</code>, " +
           "<code>.jpeg</code>) or an animated sprite object (<code>.json</code>, made with the " +
           "<a href=\"sprite-object.html\">sprite object editor</a>). The engine puts " +
@@ -509,7 +509,10 @@
           "<code>assets/sprites/liisaBlink.json</code>. A sprite object starts all of its " +
           "animations as soon as it is shown; this command has no way to pick one.");
         note(box, "Re-using an id replaces that sprite instead of adding a second one. " +
-          "A pair like <code>60%,0</code> places the sprite's horizontal centre by hand.");
+          "A pair like <code>60%,100%</code> places the sprite by hand: the first number is where its " +
+          "horizontal centre goes (percent of the screen width), the second where its <em>bottom " +
+          "edge</em> goes (percent of the screen height). <code>100%</code> stands it on the bottom " +
+          "of the screen; <code>0</code> puts it entirely above the screen.");
       }
     },
 
