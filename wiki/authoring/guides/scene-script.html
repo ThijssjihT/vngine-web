@@ -201,10 +201,11 @@
     <h2 id="audio">Audio</h2>
     <p>Audio files live under <code>qml/game/assets/audio/</code> and are named relative to it, for
     example <code>music/Origami.mp3</code> or <code>sfx/boink.mp3</code>. Every command here scales
-    its volume by the matching volume slider on the Settings screen, so the game needs that channel
-    declared under <code>audio_channels</code> in the <a href="manifest.html">manifest</a>:
-    <code>music</code> for <code>audio_bg</code>, <code>game_fx</code> for <code>audio_fx</code> and
-    <code>looping_fx</code> for <code>audio_loop</code>. A <code>volume</code> in a command is a
+    its volume by the volume slider of its channel on the Settings screen: <code>music</code> for
+    <code>audio_bg</code>, <code>game_fx</code> for <code>audio_fx</code> and <code>looping_fx</code>
+    for <code>audio_loop</code>. These channels always exist; the
+    <a href="manifest.html">manifest</a> can relabel them, change their default volume or hide their
+    slider, but does not need to mention them. A <code>volume</code> in a command is a
     multiplier from 0 to 1 on top of that slider (default 1).</p>
 
     <h3>audio_bg — background music</h3>

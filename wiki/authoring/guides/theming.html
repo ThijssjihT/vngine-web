@@ -57,17 +57,20 @@
     falls back to the engine default.</p>
     <p>A save remembers the style id of each category and resolves it again on load, so a loaded
     game looks the way it did when it was saved, including any later edits to the style file.</p>
-    <p>Every new game and every loaded game starts from the engine default for all three
-    categories, before the first <code>style</code> command or the saved ids are applied.</p>
 
-    <div class="todo"><strong>Planned</strong> — <code>default_styles</code> in the
-    <a href="manifest.html">manifest</a>, naming a style per category to use from the start of the
-    game:
+    <h2>The starting style</h2>
+    <p>Set the style each category starts with in the <a href="manifest.html">manifest</a>, under
+    <code>default_styles</code>:</p>
 <pre><code>"default_styles": {
     "textbox": "boring_textbox"
 }</code></pre>
-    The manifest generator writes it and the sample game declares it, but the engine does not read it
-    yet. Until it does, put a <code>style</code> command at the top of your first scene.</div>
+    <p>Every new game starts with these, before the first command of the entry scene runs. A
+    category you leave out, or the whole block left out, starts from the engine default. The id is
+    resolved like any other, <code>base</code> chain included; if it cannot be loaded, the engine
+    warns and that category uses the engine default.</p>
+    <p>A loaded game starts from the same styles and then applies the ids stored in the save, so it
+    looks the way it did when it was saved. A <code>style</code> command does not go back to the
+    manifest's choice by itself: to return to it later in the story, name that style again.</p>
 
     <h2>The textbox style</h2>
     <p>These are the engine defaults. Anything you do not set behaves like this.</p>
