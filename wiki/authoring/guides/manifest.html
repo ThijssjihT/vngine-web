@@ -45,13 +45,34 @@
     them and stores the values. Settings can be read from the script exactly like variables.</p>
 
     <h3>Audio channels</h3>
-    <p>Each channel becomes a volume slider. <code>default</code> is a percentage.</p>
+    <p>The engine has five fixed audio channels. They always exist, whether or not the manifest
+    mentions them, and each visible one gets a volume slider on the Settings screen. You cannot add
+    channels of your own; <code>audio_channels</code> only adjusts the five that are there.</p>
+    <table>
+      <tr><th>Channel</th><th>Used by</th><th>Label</th><th>Default</th><th>Shown</th></tr>
+      <tr><td><code>music</code></td><td><code>audio_bg</code></td><td>Music</td><td>80</td><td>yes</td></tr>
+      <tr><td><code>game_fx</code></td><td><code>audio_fx</code></td><td>Sound effects</td><td>80</td><td>yes</td></tr>
+      <tr><td><code>looping_fx</code></td><td><code>audio_loop</code></td><td>Ambience</td><td>80</td><td>yes</td></tr>
+      <tr><td><code>voice</code></td><td>— (planned)</td><td>Voice</td><td>100</td><td>no</td></tr>
+      <tr><td><code>text_fx</code></td><td>— (planned)</td><td>Text sounds</td><td>40</td><td>no</td></tr>
+    </table>
+    <p>Each entry under <code>audio_channels</code> overrides any of three keys for one channel;
+    anything you leave out keeps the engine value.</p>
+    <table>
+      <tr><th>Key</th><th>Type</th><th>Meaning</th></tr>
+      <tr><td><code>label</code></td><td>string</td><td>Text next to the slider.</td></tr>
+      <tr><td><code>default</code></td><td>number, 0–100</td><td>Starting volume in percent, until the player moves the slider.</td></tr>
+      <tr><td><code>hidden</code></td><td>bool</td><td>Leave the slider off the Settings screen.</td></tr>
+    </table>
 <pre><code>"audio_channels": {
-    "music":   { "label": "Music",   "default": 80 },
-    "voice":   { "label": "Voice",   "default": 100 },
-    "game_fx": { "label": "GameFX",  "default": 80 },
-    "text_fx": { "label": "TextFX",  "default": 40 }
+    "music":      { "label": "Soundtrack", "default": 60 },
+    "looping_fx": { "hidden": true }
 }</code></pre>
+    <p>Hiding a channel only removes its slider. The channel still plays, at its
+    <code>default</code> volume, so hide the channels your game does not use rather than the ones it
+    does. Setting <code>"hidden": false</code> on <code>voice</code> or <code>text_fx</code> shows a
+    slider, but nothing plays on those channels yet. A key that is not one of the five channels is
+    ignored, with a warning in the log.</p>
 
     <h3>Languages</h3>
 <pre><code>"languages": {
