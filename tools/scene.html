@@ -1862,11 +1862,14 @@
     /* Only the actions that compute a volume read the channel's setting. */
     var readsVolume = c.cmd === "audio_fx" || action === "setMusic" ||
                       action === "setVolume" || action === "start";
+    /* The engine always defines all five channels, so the volume setting always exists.
+       Only a channel the manifest hides is worth a word: it still plays, at its default
+       volume, but the player has no slider to change it. */
     var channel = AUDIO_CHANNEL[c.cmd];
-    if (readsVolume && manifest && manifest.channels.indexOf(channel) === -1)
-      pushNote(out, "warn", "The manifest declares no <code>" + channel + "</code> audio " +
-        "channel, which is where this command takes the player's volume from. The setting " +
-        "lookup fails (\"Unknown setting\" in the log) and the computed volume is not a number.", i);
+    if (readsVolume && manifest && manifest.hiddenChannels.indexOf(channel) !== -1)
+      pushNote(out, "info", "The manifest hides the <code>" + channel + "</code> channel. " +
+        "This still plays at that channel's default volume, but the player has no slider " +
+        "for it on the settings page.", i);
   }
 
   function checkNotices(g) {
@@ -2710,9 +2713,14 @@
                     : name === "sliders" ? "int" : "string";
       });
     });
-    var channels = T.isPlainObject(data.audio_channels) ? Object.keys(data.audio_channels) : [];
+    /* Same rule as Settings._applyManifest(): an override's hidden wins, else the engine's. */
+    var overrides = T.isPlainObject(data.audio_channels) ? data.audio_channels : {};
+    var hiddenChannels = window.AUDIO_CHANNELS.filter(function (ch) {
+      var o = T.isPlainObject(overrides[ch.key]) ? overrides[ch.key] : {};
+      return o.hidden !== undefined ? !!o.hidden : ch.hidden;
+    }).map(function (ch) { return ch.key; });
     manifest = { title: str(data.title) || "game.json", vars: vars, settings: settings,
-                 entry: str(data.entry_scene), channels: channels };
+                 entry: str(data.entry_scene), hiddenChannels: hiddenChannels };
     render();
     renderChips();
   }

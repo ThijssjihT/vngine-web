@@ -102,13 +102,11 @@
 
       <fieldset>
         <legend>Audio channels</legend>
-        <p class="hint">Each channel becomes a volume slider on the settings page.
-        <code>default</code> is a percentage.</p>
-        <div class="list" id="list-audio_channels"></div>
-        <div class="btn-row">
-          <button type="button" class="btn" data-add="audio_channels">Add channel</button>
-          <span class="list-count" data-count="audio_channels"></span>
-        </div>
+        <p class="hint">The engine always has these five channels; the manifest can only
+        override them. Leave a field empty, or a choice marked <em>(default)</em>, to keep what the engine
+        says (shown greyed). Only what you set is written to the file. A shown channel becomes
+        a volume slider on the settings page; <code>default</code> is its starting volume, 0–100.</p>
+        <div class="list" id="audioChannels"></div>
       </fieldset>
 
       <fieldset>
@@ -223,7 +221,7 @@
               <div class="tp-logo" id="tpLogo"></div>
               <div class="tp-footcol" id="tpFootCol">
                 <div class="tp-baseline" id="tpBaseline">
-                  <span id="tpEngine">VNgine</span><span id="tpVersion">v0.5.0.prealpha</span>
+                  <span id="tpEngine">VNgine</span><span id="tpVersion"></span>
                 </div>
                 <div id="tpAuthor">By Thijs Janssen</div>
               </div>
@@ -277,7 +275,6 @@
   function starterLists() {
     return {
       variables:      [{ key: "chapter_title", type: "string", "default": "Prologue" }],
-      audio_channels: [{ key: "music", label: "Music", "default": 80 }],
       languages:      [],
       toggles:        [],
       dropdowns:      [],
@@ -288,7 +285,7 @@
   }
 
   function emptyLists() {
-    return { variables: [], audio_channels: [], languages: [], toggles: [],
+    return { variables: [], languages: [], toggles: [],
              dropdowns: [], textfields: [], sliders: [], credits: [] };
   }
 
@@ -296,6 +293,21 @@
   var lists  = starterLists();
   var extras      = {};       /* top-level keys we do not model, preserved verbatim */
   var extraStyles = {};       /* default_styles categories we do not model */
+
+  /* Audio channels are not a list: the engine has five fixed ones (AUDIO_CHANNELS in
+     engine-defaults.js) and the manifest only overrides them. null means "not set", so
+     the engine's own value applies and nothing is written. */
+  var CHANNELS = window.AUDIO_CHANNELS;
+  var CHANNEL_FIELDS = ["label", "default", "hidden"];   /* all the engine reads */
+  function emptyAudio() {
+    var a = {};
+    CHANNELS.forEach(function (ch) { a[ch.key] = { label: null, "default": null, hidden: null }; });
+    return a;
+  }
+  var audio          = emptyAudio();
+  var extraChannels  = {};    /* channel keys the engine ignores, preserved verbatim */
+  var extraChanKeys  = {};    /* channel -> { key: value } the engine does not read, preserved */
+  var audioLoadNotes = [];    /* things changed or found while loading audio_channels */
   var banner      = null;     /* data URL, preview only */
 
   /* --------------------------------------------------------- list schemas */
@@ -318,22 +330,6 @@
         var type = typeof v.type === "string" ? v.type : guessType(v["default"]);
         return { key: k, type: type,
                  "default": v["default"] === undefined ? coerce(type, "") : v["default"] };
-      }
-    },
-
-    audio_channels: {
-      grid: "minmax(0,1fr) minmax(0,1fr) 6rem",
-      limit: null,
-      fields: [
-        { name: "key",     label: "key",   type: "text" },
-        { name: "label",   label: "label", type: "text" },
-        { name: "default", label: "0–100", type: "number", min: 0, max: 100, step: 1 }
-      ],
-      make: function () { return { key: "", label: "", "default": 80 }; },
-      toJson: function (e) { return { label: e.label, "default": e["default"] }; },
-      fromJson: function (k, v) {
-        v = T.isPlainObject(v) ? v : {};
-        return { key: k, label: str(v.label), "default": num(v["default"], 80) };
       }
     },
 
@@ -441,7 +437,7 @@
   };
 
   /* Written in the order the sample game.json uses. */
-  var COLLECTIONS = ["audio_channels", "languages", "toggles", "dropdowns",
+  var COLLECTIONS = ["languages", "toggles", "dropdowns",
                      "textfields", "sliders", "variables"];
   var LIST_ORDER  = COLLECTIONS.concat(["credits"]);
 
@@ -472,7 +468,7 @@
   }
 
   function label(name) {
-    return { variables: "Variables", audio_channels: "Audio channels", languages: "Languages",
+    return { variables: "Variables", languages: "Languages",
              toggles: "Toggles", dropdowns: "Dropdowns", textfields: "Text fields",
              sliders: "Sliders", credits: "Credits" }[name] || name;
   }
@@ -675,7 +671,68 @@
     });
   }
 
-  function renderAllLists() { LIST_ORDER.forEach(renderList); }
+  /* One row per fixed engine channel. Every field is an override: empty, or the
+     "engine default" choice, means the key is left out of the file. */
+  function renderAudio() {
+    var box = document.getElementById("audioChannels");
+    box.innerHTML = "";
+
+    CHANNELS.forEach(function (ch) {
+      var o   = audio[ch.key];
+      var row = el("div", "list-row");
+      row.style.gridTemplateColumns = "minmax(0,.9fr) minmax(0,1.3fr) 5.5rem minmax(0,1fr)";
+
+      function cell(caption, input) {
+        var c = el("div", "cell"), cap = el("span");
+        cap.textContent = caption;
+        c.appendChild(cap); c.appendChild(input);
+        return c;
+      }
+
+      var name = el("code");
+      name.textContent = ch.key;
+      name.style.padding = ".42rem 0";
+      row.appendChild(cell("channel", name));
+
+      var lab = el("input");
+      lab.type = "text";
+      lab.placeholder = ch.label;
+      lab.value = o.label === null ? "" : o.label;
+      lab.addEventListener("input", function () {
+        o.label = lab.value === "" ? null : lab.value;
+        render();
+      });
+      row.appendChild(cell("label", lab));
+
+      var vol = el("input");
+      vol.type = "number";
+      vol.min = 0; vol.max = 100; vol.step = 1;
+      vol.placeholder = ch.defaultVolume;
+      vol.value = o["default"] === null ? "" : o["default"];
+      vol.addEventListener("input", function () {
+        o["default"] = vol.value.trim() === "" ? null : num(vol.value, ch.defaultVolume);
+        render();
+      });
+      row.appendChild(cell("default", vol));
+
+      /* Three states, because hidden: false is meaningful on a channel the engine hides */
+      var vis = el("select");
+      [["", (ch.hidden ? "hidden" : "shown") + " (default)"],
+       ["shown", "shown"], ["hidden", "hidden"]].forEach(function (p) {
+        var opt = el("option"); opt.value = p[0]; opt.textContent = p[1]; vis.appendChild(opt);
+      });
+      vis.value = o.hidden === null ? "" : (o.hidden ? "hidden" : "shown");
+      vis.addEventListener("change", function () {
+        o.hidden = vis.value === "" ? null : vis.value === "hidden";
+        render();
+      });
+      row.appendChild(cell("on settings page", vis));
+
+      box.appendChild(row);
+    });
+  }
+
+  function renderAllLists() { LIST_ORDER.forEach(renderList); renderAudio(); }
 
   Array.prototype.forEach.call(form.querySelectorAll("[data-add]"), function (btn) {
     var name = btn.getAttribute("data-add");
@@ -716,6 +773,23 @@
     return out;
   }
 
+  /* Engine order, only the fields that are set, then whatever the engine would ignore,
+     exactly as it was loaded. */
+  function audioBlock() {
+    var out = {};
+    CHANNELS.forEach(function (ch) {
+      var o = audio[ch.key], e = {};
+      if (o.label !== null)      e.label     = o.label;
+      if (o["default"] !== null) e["default"] = o["default"];
+      if (o.hidden !== null)     e.hidden    = o.hidden;
+      var extra = extraChanKeys[ch.key] || {};
+      Object.keys(extra).forEach(function (k) { e[k] = extra[k]; });
+      if (Object.keys(e).length) out[ch.key] = e;
+    });
+    Object.keys(extraChannels).forEach(function (k) { out[k] = extraChannels[k]; });
+    return out;
+  }
+
   function buildOutput() {
     var o = {};
     o.title   = state.title;
@@ -731,6 +805,9 @@
     });
     Object.keys(extraStyles).forEach(function (c) { if (!(c in ds)) ds[c] = extraStyles[c]; });
     if (Object.keys(ds).length) o.default_styles = ds;
+
+    var ac = audioBlock();
+    if (Object.keys(ac).length) o.audio_channels = ac;
 
     COLLECTIONS.forEach(function (name) {
       if (lists[name].length) o[name] = collection(name);
@@ -784,7 +861,7 @@
                              " a generated name in the file."]);
     });
 
-    ["audio_channels", "languages"].forEach(function (name) {
+    ["languages"].forEach(function (name) {
       var seen = {}, unnamed = 0;
       lists[name].forEach(function (e) {
         var k = (e.key || "").trim();
@@ -821,11 +898,26 @@
         out.push(["warn", "Slider <code>" + k + "</code>: the default sits outside min–max."]);
     });
 
-    lists.audio_channels.forEach(function (e) {
-      if (e["default"] < 0 || e["default"] > 100)
-        out.push(["warn", "Audio channel <code>" + esc(e.key || "(unnamed)") +
-                  "</code>: the default is a percentage, 0–100."]);
+    CHANNELS.forEach(function (ch) {
+      var o = audio[ch.key];
+      if (o["default"] !== null && (o["default"] < 0 || o["default"] > 100))
+        out.push(["warn", "Audio channel <code>" + ch.key +
+                  "</code>: the default is a volume, 0–100."]);
+      if (o.label !== null && !o.label.trim())
+        out.push(["warn", "Audio channel <code>" + ch.key + "</code>: the label is only " +
+                  "spaces, so its slider has no visible name."]);
+      var extra = Object.keys(extraChanKeys[ch.key] || {});
+      if (extra.length)
+        out.push(["warn", "Audio channel <code>" + ch.key + "</code>: the engine reads only " +
+                  "<code>label</code>, <code>default</code> and <code>hidden</code>, so <code>" +
+                  extra.map(esc).join("</code>, <code>") + "</code> does nothing. Kept in the file."]);
     });
+    Object.keys(extraChannels).forEach(function (k) {
+      out.push(["warn", "Audio channel <code>" + esc(k) + "</code> is not one of the engine's " +
+                "five channels (<code>" + CHANNELS.map(function (c) { return c.key; }).join("</code>, <code>") +
+                "</code>). The engine ignores it with a warning. Kept in the file, not editable here."]);
+    });
+    audioLoadNotes.forEach(function (n) { out.push(n); });
 
     var sdv = state.save_display_variable.trim();
     if (sdv && !lists.variables.some(function (e) { return e.key.trim() === sdv; }))
@@ -956,6 +1048,7 @@
     engineEl.style.fontSize = px(TH.fontSizeSmall);
 
     var versionEl = document.getElementById("tpVersion");
+    versionEl.textContent    = "v" + window.ENGINE_VERSION.version + "." + window.ENGINE_VERSION.release;
     versionEl.style.color    = secondary;
     versionEl.style.fontSize = px(TH.fontSizeExtraSmall);
 
@@ -1005,6 +1098,62 @@
   var KNOWN_SCALARS = ["title", "version", "default_language", "entry_scene",
                        "save_display_variable", "tagline"];
 
+  /* Values the engine would not read the way they are written (a label that is not a
+     string, say) are converted and reported, so the file the editor writes back is the
+     one the engine actually runs. */
+  function loadAudio(block) {
+    audio          = emptyAudio();
+    extraChannels  = {};
+    extraChanKeys  = {};
+    audioLoadNotes = [];
+    if (block === undefined) return;
+    if (!T.isPlainObject(block)) {
+      audioLoadNotes.push(["warn", "<code>audio_channels</code> in the loaded file is not an " +
+                           "object, so it was dropped. The engine treats it as absent."]);
+      return;
+    }
+    Object.keys(block).forEach(function (k) {
+      if (!audio[k]) { extraChannels[k] = block[k]; return; }
+      var v = block[k], o = audio[k];
+      if (!T.isPlainObject(v)) {
+        audioLoadNotes.push(["warn", "Audio channel <code>" + esc(k) + "</code> was not an " +
+                             "object in the loaded file, so it was dropped."]);
+        return;
+      }
+      Object.keys(v).forEach(function (f) {
+        if (CHANNEL_FIELDS.indexOf(f) === -1) {
+          (extraChanKeys[k] = extraChanKeys[k] || {})[f] = v[f];
+          return;
+        }
+        var val = v[f];
+        if (val === undefined || val === null) return;
+        if (f === "label") {
+          if (typeof val !== "string") {
+            audioLoadNotes.push(["info", "Audio channel <code>" + esc(k) + "</code>: the label " +
+                                 "was not text and has been converted."]);
+          }
+          o.label = String(val);
+          if (o.label === "") {
+            o.label = null;
+            audioLoadNotes.push(["info", "Audio channel <code>" + esc(k) + "</code>: an empty " +
+                                 "label was dropped, so the engine label is used again."]);
+          }
+        } else if (f === "default") {
+          o["default"] = num(val, null);
+          if (o["default"] === null || typeof val !== "number")
+            audioLoadNotes.push(["warn", "Audio channel <code>" + esc(k) + "</code>: the default " +
+                                 "“" + esc(val) + "” was not a number" +
+                                 (o["default"] === null ? " and was dropped." : " and has been converted.")]);
+        } else if (f === "hidden") {
+          if (typeof val !== "boolean")
+            audioLoadNotes.push(["info", "Audio channel <code>" + esc(k) + "</code>: " +
+                                 "<code>hidden</code> was not true or false and has been converted."]);
+          o.hidden = !!val;
+        }
+      });
+    });
+  }
+
   function loadManifest(data) {
     if (!T.isPlainObject(data)) {
       alert("That file is not a JSON object, so it is not a VNgine manifest.");
@@ -1015,6 +1164,7 @@
     lists       = emptyLists();
     extras      = {};
     extraStyles = {};
+    loadAudio(data.audio_channels);
 
     KNOWN_SCALARS.forEach(function (k) {
       next[k] = data[k] === undefined ? "" : String(data[k]);
@@ -1036,7 +1186,7 @@
       });
     });
 
-    var known = KNOWN_SCALARS.concat(LIST_ORDER).concat(["default_styles"]);
+    var known = KNOWN_SCALARS.concat(LIST_ORDER).concat(["default_styles", "audio_channels"]);
     Object.keys(data).forEach(function (k) {
       if (known.indexOf(k) === -1) extras[k] = data[k];
     });
@@ -1053,6 +1203,7 @@
   });
 
   document.getElementById("resetBtn").addEventListener("click", function () {
+    loadAudio(undefined);
     lists       = starterLists();
     extras      = {};
     extraStyles = {};

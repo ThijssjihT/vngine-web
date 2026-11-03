@@ -1,6 +1,8 @@
 /* Engine defaults, mirrored from qml/engine/engine_defaults/*.json in the VNgine repo.
    Keep in sync when the engine defaults change. */
 
+window.ENGINE_VERSION = { version: "0.5", release: "0-prealpha" };
+
 window.ENGINE_DEFAULTS = {
   textbox: {
     style: {
@@ -40,6 +42,18 @@ window.ENGINE_DEFAULTS = {
   }
 };
 
+/* The five audio channels the engine always defines, mirrored from audioChannels in
+   qml/engine/components/Constants.js. A manifest's audio_channels block can only override
+   label, default and hidden on these; any other channel key is ignored with a warning.
+   Same order as the engine, which is also the order of the sliders on the settings page. */
+window.AUDIO_CHANNELS = [
+  { key: "music",      label: "Music",         defaultVolume: 80,  hidden: false },
+  { key: "voice",      label: "Voice",         defaultVolume: 100, hidden: true  },
+  { key: "game_fx",    label: "Sound effects", defaultVolume: 80,  hidden: false },
+  { key: "looping_fx", label: "Ambience",      defaultVolume: 80,  hidden: false },
+  { key: "text_fx",    label: "Text sounds",   defaultVolume: 40,  hidden: true  }
+];
+
 /* Device profiles for the previews, given as the portrait (short × long) resolution.
    Silica's Theme.pixelRatio scales against a 540 px wide reference screen, so the
    generators derive it as shortSide / 540 rather than hard-coding a number.
@@ -47,11 +61,12 @@ window.ENGINE_DEFAULTS = {
 window.PIXEL_RATIO_REFERENCE = 540;
 
 window.DEVICE_PROFILES = [
-  { id: "xperia10iii", label: "Xperia 10 III — 1080×2520", width: 1080, height: 2520 },
-  { id: "jolla-c2",    label: "Jolla C2 — 720×1600",       width: 720,  height: 1600 },
-  { id: "xperia-xa2",  label: "Xperia XA2 — 1080×1920",    width: 1080, height: 1920 },
-  { id: "base",        label: "Reference — 540×960",       width: 540,  height: 960 },
-  { id: "custom",      label: "Custom…",                   width: 1080, height: 2340, custom: true }
+  { id: "xperia10iii", label: "Xperia 10 III — 1080×2520",      width: 1080, height: 2520 },
+  { id: "jolla-c2",    label: "Jolla C2 — 720×1600",            width: 720,  height: 1600 },
+  { id: "xperia-xa2",  label: "Xperia XA2 — 1080×1920",         width: 1080, height: 1920 },
+  { id: "jolla2026",   label: "Jolla Phone (2026) — 1080×1920", width: 1032, height: 2272 },
+  { id: "base",        label: "Reference — 540×960",            width: 540,  height: 960 },
+  { id: "custom",      label: "Custom…",                        width: 1080, height: 2340, custom: true }
 ];
 
 /* Approximate Silica Theme constants, in reference pixels (pixelRatio 1.0, a 540 px wide
