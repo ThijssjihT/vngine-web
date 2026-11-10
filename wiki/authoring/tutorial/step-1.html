@@ -11,8 +11,116 @@
 <div class="layout">
   <aside class="sidebar" data-wiki-tree></aside>
   <main>
+    <!-- Page text written by Thijs. Claude only fixed spelling and wording and added the headings. -->
     <h1>1. Set up your game folder</h1>
-    <div class="todo"><strong>TODO</strong> — this page has not been written yet.</div>
+    <p class="lede">This guide assumes you have the Sailfish IDE installed. If not, please go to
+    <a href="https://docs.sailfishos.org/Tools/Sailfish_SDK/Installation/">the Sailfish SDK installation guide</a>
+    and make sure you have the IDE installed.</p>
+
+    <h2>Create the project</h2>
+    <p>Open the Sailfish IDE, create a new project, and choose <code>Sailfish OS Qt Quick Application</code>
+    under <code>Application</code>. Choose a name for your project. VNgine is designed with Harbour compliance
+    in mind, and you are strongly encouraged to at least make your game available on Harbour. To keep your
+    game Harbour compliant, make sure the project name is lower case and starts with <code>harbour-</code>,
+    like VNgine is distributed as <code>harbour-vngine</code>.</p>
+    <p>On the next page, put a summary and a description. It is worth taking your time here, but you can
+    always change it afterwards. Leave or change the version number, but if you choose to change it, make
+    sure it contains only numbers, separated with dots.</p>
+    <p>The default build system, qmake, is the choice here, as I didn't test other build systems.</p>
+    <p>Select all kits. For Harbour, we need to supply both 64-bit (aarch64) and 32-bit (armv7) packages.
+    The i486 kit is needed for the emulator.</p>
+    <p>I encourage you to use git as version control, but you are in no way required to. Please remember: if
+    you use licensed assets in your game, it is not always legal to push them to GitHub. Please check whether
+    you are allowed to open source your assets. You could always <code>.gitignore</code> some or all assets.
+    This guide will not help you with this.</p>
+    <p>Press Finish to let the IDE build you a standard template.</p>
+
+    <h2>The main QML file</h2>
+    <p>After a few seconds, your new project is ready, and the file <code>harbour-yourprojectname.qml</code>
+    is opened. Delete all code from this file. Copy the two lines from this code block, and paste them into
+    your <code>harbour-yourprojectname.qml</code>.</p>
+<pre><code>import "engine/components" as Components
+Components.VNgineApplicationWindow { }</code></pre>
+    <p>This code is run when your application is started. All it does is initialise and start the game
+    engine. We will add the engine and the game at a later stage. First, we need to look at permissions.</p>
+
+    <h2>The desktop file</h2>
+    <h3>Permissions</h3>
+    <p>VNgine needs permission to use audio. When you build and run in developer mode, the game runs
+    without a sandbox, and sound seems to work. However, every time you start the game from your device,
+    the sandbox will not allow sound to be played by default. We need to allow this ourselves. Open
+    <code>harbour-yourprojectname.desktop</code>.</p>
+    <p>Under <code>[X-Sailjail]</code>, set your <code>OrganizationName</code> as a reverse domain name. It
+    doesn't have to be the reverse of a real domain you own, it just takes this form. Two examples:</p>
+<pre><code>com.firstnamelastname
+org.forumhandle</code></pre>
+    <p>Please keep the organisation name the same across all your projects.</p>
+    <p>Set your <code>ApplicationName</code>. It does not have to be the same as
+    <code>harbour-yourprojectname</code>, but it should easily identify your application.</p>
+    <p><code>OrganizationName</code> and <code>ApplicationName</code> are used in your game's folders. On every
+    device the game is installed on, there will be an <code>OrganizationName/ApplicationName</code> folder,
+    used for save games and other small files a user will generally not interact with.</p>
+    <p><code>Permissions</code> should be set to <code>Audio</code>, so the full line reads
+    <code>Permissions=Audio</code>.</p>
+
+    <h3>Launcher name</h3>
+    <p>With <code>harbour-yourprojectname.desktop</code> still open, let's look at the rest of the file.
+    There are two lines you should change.</p>
+    <p><code>Name=</code> is the name of your game as it is displayed in the app launcher. You should change
+    the default <code>harbour-yourprojectname</code> to something more appropriate. For example, for the
+    engine's example game, the default <code>Name=harbour-vngine</code> was changed into
+    <code>Name=VNgine Demo</code>.</p>
+    <p>You can give your game different names for different locales. At the time of writing, a German name
+    (<code>Name[de]=</code>) is active by default. Comment this line out, or change it to the German
+    translation of what you put after <code>Name=</code>. By copying this line and changing the language
+    code, you can add multiple translations of the name that is displayed in the launcher.</p>
+
+    <h2>The project file</h2>
+    <p>We are now done with the desktop file. Let's move on to the file that defines your project:
+    <code>harbour-yourprojectname.pro</code>.</p>
+    <p>Find <code>DISTFILES</code>. It is appended with multiple files in your project. Remove these three
+    lines:</p>
+<pre><code>    qml/cover/CoverPage.qml \
+    qml/pages/FirstPage.qml \
+    qml/pages/SecondPage.qml \</code></pre>
+    <p>After the desktop file, add a space and a backslash (<code> \</code>) and press Enter. Add the
+    following two lines:</p>
+<pre><code>    $$files(qml/game/**, true) \
+    $$files(qml/engine/**, true)</code></pre>
+    <p>Every line should end with a backslash, except the last line. This <code>DISTFILES</code> variable
+    tells the IDE to include all engine and game files in the project, so everything is included in the
+    game package.</p>
+    <p>If you don't plan to translate your game, you might want to comment out the
+    <code>TRANSLATIONS</code> and <code>CONFIG</code> lines.</p>
+
+    <h2>Clean up the qml folder</h2>
+    <p>Save all files. Open the project folder in your file browser and open the <code>qml</code> folder.
+    In here, delete the <code>cover</code> and <code>pages</code> folders, with everything in them. The
+    engine doesn't need these.</p>
+
+    <h2>Add the engine</h2>
+    <p>Clone the VNgine project from <a href="https://github.com/ThijssjihT/VNgine">github.com/ThijssjihT/VNgine</a>.
+    If you don't know how this works, go to that page, click the green button that says
+    <code>&lt;&gt; Code</code>, and choose <code>Download ZIP</code>. Extract the zip.</p>
+    <p>Whichever way you got the files, we are going to copy two folders and their contents:
+    <code>qml/engine</code> and <code>qml/game-directory-structure</code>. Leave <code>qml/game</code>; this
+    folder contains the sample game, which we won't need, but you might want to keep it around to look at
+    some files as an example at any point.</p>
+    <p>Paste <code>qml/engine</code> and <code>qml/game-directory-structure</code> into your project's
+    <code>qml</code> folder. Then rename <code>qml/game-directory-structure</code> to
+    <code>qml/game</code>.</p>
+
+    <h2>Build and run</h2>
+    <p>The IDE should pick up all the files you just added. If not, close your project and re-open it.</p>
+    <p>Your project should now build and run. See if it does. Don't worry if you see errors; that is
+    expected, as the engine tries to set up a new game that isn't there yet.</p>
+    <p>Your project is now completely set up and ready for your game, and you are ready for the next step
+    in the tutorial.</p>
+
+    <div class="pager">
+      <a href="index.html">← Step by step tutorial</a>
+      <a href="step-2.html">2. Write your first scene →</a>
+    </div>
   </main>
 </div>
 <script src="../../../assets/js/sitemap.js"></script>
