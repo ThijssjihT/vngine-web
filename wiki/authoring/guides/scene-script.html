@@ -32,10 +32,9 @@
     ]
 }</code></pre>
 
-    <div class="todo"><strong>Authoring rule</strong> — a scene must end with a <code>jump</code>.
-    Running off the end of the command list is an authoring error; the engine warns and pops back
-    out of the game screen. An <code>end</code> command, for finishing a story properly, is
-    <a href="#planned">planned</a>.</div>
+    <div class="todo"><strong>Authoring rule</strong> — a scene must finish with a <code>jump</code>
+    or an <code>end</code>. Running off the end of the command list is an authoring error; the engine
+    warns and returns to the title page.</div>
 
     <h2>Implemented commands</h2>
     <table>
@@ -71,6 +70,9 @@
       <tr><td><code>audio_loop</code></td><td><code>action</code>, <code>id</code> and more</td>
           <td>Starts and stops looping sound effects such as rain or a crowd.
               See <a href="#audio">Audio</a>.</td></tr>
+      <tr><td><code>end</code></td><td>none</td>
+          <td>Finishes the story or a route. A stopgap for now: fades out the audio and returns to
+              the title page, with no end card yet (that part is <a href="#planned">planned</a>).</td></tr>
     </table>
 
     <p>An unknown command is logged and skipped, so a typo will not stall the game — but it will
@@ -262,7 +264,7 @@
     does no harm — an unknown command is logged and skipped — but it has no effect either.</p>
     <table>
       <tr><th>Command or key</th><th>Intended use</th></tr>
-      <tr><td><code>end</code></td><td>End of the game or a route: shows an end card and returns to the title screen.</td></tr>
+      <tr><td>End card for <code>end</code></td><td><code>end</code> itself works, as a stopgap (see above): it fades out the audio and returns to the title page. The planned version shows an end card first.</td></tr>
       <tr><td><code>wait</code></td><td>Pause for a number of milliseconds before continuing.</td></tr>
       <tr><td><code>show_hud</code> and the HUD itself</td><td>Show or hide a variable value in an on-screen overlay, drawn with the <code>hud</code> style.</td></tr>
       <tr><td><code>audio_voice</code></td><td>Voiced lines on the <code>voice</code> channel.</td></tr>

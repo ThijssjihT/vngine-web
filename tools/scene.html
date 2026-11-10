@@ -888,16 +888,15 @@
     },
 
     end: {
-      title: "end", group: "flow", impl: false,
+      title: "end", group: "flow", impl: true,
       make: function () { return { cmd: "end" }; },
       from: function (c) { return { cmd: "end", _extra: takeExtras(c, ["cmd"]) }; },
       to: function (e) { return withExtras({ cmd: "end" }, e); },
       summary: function () { return "end of route"; },
       body: function (e, box) {
         box.className = "cmd-body one";
-        note(box, "Not implemented. Today the engine logs an unknown command and steps past it, " +
-          "so put it last and the scene ends anyway — by running off the end, with two warnings " +
-          "in the log rather than a clean stop.", true);
+        note(box, "Stopgap for now: the engine fades out the audio and returns to the title page. " +
+          "There is no end card yet. Anything after <code>end</code> in the same block is never run.");
       }
     },
 
@@ -1537,7 +1536,7 @@
         if (!last.options.length) b.out.push({ to: next, kind: "fall", tag: "no options" });
 
       } else if (last.cmd === "end") {
-        b.out.push({ to: next, kind: "fall", tag: "end is not implemented — steps past" });
+        /* no edge: the engine leaves the scene for the title page here */
 
       } else {
         b.out.push({ to: next, kind: "fall", tag: "" });
@@ -1650,6 +1649,11 @@
       if (lines.childNodes.length) box.appendChild(lines);
 
       var exit = elt("div", "blk-exit");
+      if (cmds[b.to] && cmds[b.to].cmd === "end") {
+        var endLine = elt("div", "blk-line e-end", "■ end — back to the title page");
+        endLine.title = endLine.textContent;
+        exit.appendChild(endLine);
+      }
       b.out.forEach(function (e) {
         var cls = e.kind === "jump" ? "e-jump" : e.kind === "cond" ? "e-cond"
                 : (e.kind === "choice" || e.kind === "choicefall") ? "e-choice" : "e-fall";
@@ -1972,8 +1976,8 @@
         pushNote(out, "warn", "Never reached — commands #" + b.from + "–" + b.to + ".", b.from);
       b.out.forEach(function (e) {
         if (e.to === -1 && !e.missing)
-          pushNote(out, "err", "Execution can run off the end of the scene here. A scene has to end with a jump — the engine treats falling off the end as an " +
-            "authoring error and drops the player back out of the game screen.", b.to);
+          pushNote(out, "err", "Execution can run off the end of the scene here. A scene has to finish with a <code>jump</code> or an <code>end</code> — " +
+            "the engine treats falling off the end as an authoring error, warns, and returns to the title page.", b.to);
       });
     });
 
@@ -2531,7 +2535,7 @@
     } else {
       p.appendChild(elt("span", "arr", "✗"));
       p.appendChild(elt("span", "nm", "off the end of the scene"));
-      p.appendChild(elt("span", "note", "nothing follows, and the engine drops the player out of the game screen"));
+      p.appendChild(elt("span", "note", "nothing follows — the engine warns and returns to the title page"));
     }
     return p;
   }

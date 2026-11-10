@@ -592,6 +592,7 @@ textarea:focus { outline: none; border-color: var(--accent-dim); }
 .blk-exit .e-choice { color: #8fd694; }
 .blk-exit .e-fall   { color: var(--fg-faint); }
 .blk-exit .e-stop   { color: #d05a5a; }
+.blk-exit .e-end    { color: var(--fg); }
 
 .blk.ext {
   background: var(--bg-elev-2);
